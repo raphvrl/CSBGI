@@ -1,2 +1,5 @@
+pub mod builder;
 pub mod context;
-pub mod passes;
+pub mod pass;
+
+pub use context::GraphicsContext;

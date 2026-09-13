@@ -3,11 +3,13 @@ use winit::window::{Window, WindowId};
 
 use std::sync::Arc;
 
-use crate::graphics::{context::GraphicsContext, passes::TrianglePass};
+use crate::graphics::{context::GraphicsContext, pass::TrianglePass};
 
 pub struct State {
     graphics: GraphicsContext,
+
     triangle_pass: TrianglePass,
+
     window: Arc<Window>,
 }
 

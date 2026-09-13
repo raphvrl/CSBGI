@@ -113,6 +113,14 @@ impl GraphicsContext {
         &self.queue
     }
 
+    pub fn width(&self) -> u32 {
+        self.config.width
+    }
+
+    pub fn height(&self) -> u32 {
+        self.config.height
+    }
+
     pub fn surface_format(&self) -> wgpu::TextureFormat {
         self.config.format
     }
