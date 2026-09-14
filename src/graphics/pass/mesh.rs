@@ -1,15 +1,16 @@
 use wesl::include_wesl;
 
 use crate::graphics::{
-    GraphicsContext,
+    GraphicsContext, Mesh, Vertex,
     builder::{RenderPassExt, RenderPipelineExt},
 };
 
-pub struct TrianglePass {
+pub struct MeshPass {
     pipeline: wgpu::RenderPipeline,
+    mesh: Mesh,
 }
 
-impl TrianglePass {
+impl MeshPass {
     pub fn new(graphics: &GraphicsContext) -> Self {
         let device = graphics.device();
 
@@ -22,14 +23,17 @@ impl TrianglePass {
             .render_pipeline_builder()
             .label("Triangle Pipeline")
             .shader(&shader)
+            .vertex_layout(Vertex::layout())
             .color_format(graphics.surface_format())
             .build();
 
-        Self { pipeline }
+        let mesh = Mesh::cube(device, 0.5);
+
+        Self { pipeline, mesh }
     }
 
     pub fn record(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
-        let mut render_pass = encoder
+        let mut rpass = encoder
             .render_pass_builder()
             .label("Triangle Render Pass")
             .color(view)
@@ -41,7 +45,7 @@ impl TrianglePass {
             })
             .build();
 
-        render_pass.set_pipeline(&self.pipeline);
-        render_pass.draw(0..3, 0..1);
+        rpass.set_pipeline(&self.pipeline);
+        self.mesh.draw(&mut rpass);
     }
 }

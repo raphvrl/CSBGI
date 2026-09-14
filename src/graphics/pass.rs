@@ -1,3 +1,3 @@
-pub mod triangle;
+pub mod mesh;
 
-pub use triangle::TrianglePass;
+pub use mesh::MeshPass;

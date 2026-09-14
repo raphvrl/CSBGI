@@ -3,12 +3,12 @@ use winit::window::{Window, WindowId};
 
 use std::sync::Arc;
 
-use crate::graphics::{context::GraphicsContext, pass::TrianglePass};
+use crate::graphics::{context::GraphicsContext, pass::MeshPass};
 
 pub struct State {
     graphics: GraphicsContext,
 
-    triangle_pass: TrianglePass,
+    triangle_pass: MeshPass,
 
     window: Arc<Window>,
 }
@@ -16,7 +16,7 @@ pub struct State {
 impl State {
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         let graphics = GraphicsContext::new(&window).await?;
-        let triangle_pass = TrianglePass::new(&graphics);
+        let triangle_pass = MeshPass::new(&graphics);
 
         Ok(Self {
             window,
