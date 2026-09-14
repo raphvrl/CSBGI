@@ -9,10 +9,13 @@ use std::sync::Arc;
 
 use crate::camera::{Camera, CameraController, Projection};
 use crate::clock::Clock;
-use crate::graphics::{bindings::FrameGpu, context::GraphicsContext, pass::MeshPass};
+use crate::graphics::{
+    bindings::FrameGpu, context::GraphicsContext, pass::MeshPass, targets::DepthTarget,
+};
 
 pub struct State {
     graphics: GraphicsContext,
+    depth_target: DepthTarget,
 
     camera: Camera,
     camera_ctrl: CameraController,
@@ -28,6 +31,7 @@ pub struct State {
 impl State {
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         let graphics = GraphicsContext::new(&window).await?;
+        let depth_target = DepthTarget::new(&graphics, graphics.width(), graphics.height());
 
         let aspect_ratio = graphics.width() as f32 / graphics.height() as f32;
 
@@ -46,6 +50,7 @@ impl State {
 
         Ok(Self {
             graphics,
+            depth_target,
 
             camera,
             camera_ctrl,
@@ -61,6 +66,7 @@ impl State {
 
     pub fn resize(&mut self, width: u32, height: u32) {
         self.graphics.resize(width, height);
+        self.depth_target.resize(&self.graphics, width, height);
         self.camera.resize(width, height);
     }
 
@@ -82,7 +88,7 @@ impl State {
         let device = self.graphics.device();
         let queue = self.graphics.queue();
 
-        let view = output
+        let surface_view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
 
@@ -90,8 +96,14 @@ impl State {
             label: Some("Render Encoder"),
         });
 
-        self.mesh_pass
-            .record(&mut encoder, &view, self.frame_gpu.bind_group());
+        let depth_view = self.depth_target.view();
+
+        self.mesh_pass.record(
+            &mut encoder,
+            &surface_view,
+            &depth_view,
+            self.frame_gpu.bind_group(),
+        );
 
         queue.submit(std::iter::once(encoder.finish()));
         queue.present(output);
