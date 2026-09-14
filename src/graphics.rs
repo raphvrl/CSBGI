@@ -1,3 +1,4 @@
+pub mod bindings;
 pub mod builder;
 pub mod context;
 pub mod mesh;

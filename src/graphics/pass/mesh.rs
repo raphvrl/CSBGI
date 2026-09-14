@@ -11,7 +11,7 @@ pub struct MeshPass {
 }
 
 impl MeshPass {
-    pub fn new(graphics: &GraphicsContext) -> Self {
+    pub fn new(graphics: &GraphicsContext, frame_layout: &wgpu::BindGroupLayout) -> Self {
         let device = graphics.device();
 
         let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -23,6 +23,7 @@ impl MeshPass {
             .render_pipeline_builder()
             .label("Triangle Pipeline")
             .shader(&shader)
+            .bind_group_layout(frame_layout)
             .vertex_layout(Vertex::layout())
             .color_format(graphics.surface_format())
             .build();
@@ -32,7 +33,12 @@ impl MeshPass {
         Self { pipeline, mesh }
     }
 
-    pub fn record(&self, encoder: &mut wgpu::CommandEncoder, view: &wgpu::TextureView) {
+    pub fn record(
+        &self,
+        encoder: &mut wgpu::CommandEncoder,
+        view: &wgpu::TextureView,
+        frame_bind_group: &wgpu::BindGroup,
+    ) {
         let mut rpass = encoder
             .render_pass_builder()
             .label("Triangle Render Pass")
@@ -46,6 +52,7 @@ impl MeshPass {
             .build();
 
         rpass.set_pipeline(&self.pipeline);
+        rpass.set_bind_group(0, frame_bind_group, &[]);
         self.mesh.draw(&mut rpass);
     }
 }

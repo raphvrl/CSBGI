@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 
 use bytemuck::{Pod, Zeroable};
-use glam::{Vec2, Vec3};
+use glam::Vec3;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
