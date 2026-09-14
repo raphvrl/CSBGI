@@ -1,5 +1,7 @@
+pub mod controller;
 pub mod projection;
 
+pub use controller::CameraController;
 pub use projection::Projection;
 
 use glam::{Mat4, Quat, Vec3, camera::rh::view};

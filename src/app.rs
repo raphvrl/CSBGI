@@ -1,7 +1,8 @@
 use winit::{
     application::ApplicationHandler,
-    event::WindowEvent,
-    event_loop::{ActiveEventLoop, EventLoop},
+    event::{DeviceEvent, DeviceId, ElementState, WindowEvent},
+    event_loop::{ActiveEventLoop, DeviceEvents, EventLoop},
+    keyboard::PhysicalKey,
     window::{Window, WindowId},
 };
 
@@ -9,13 +10,14 @@ use std::sync::Arc;
 
 use crate::state::State;
 
+#[derive(Default)]
 pub struct App {
     state: Option<State>,
 }
 
 impl App {
     pub fn new() -> Self {
-        Self { state: None }
+        Self::default()
     }
 
     pub fn run() {
@@ -30,6 +32,8 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        event_loop.listen_device_events(DeviceEvents::WhenFocused);
+
         let window_attributes = Window::default_attributes().with_title("CSBGI");
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
@@ -74,7 +78,42 @@ impl ApplicationHandler for App {
                 }
             }
 
+            WindowEvent::KeyboardInput { event, .. } => {
+                if let PhysicalKey::Code(key) = event.physical_key {
+                    let pressed = event.state == ElementState::Pressed;
+                    state.on_key(key, pressed);
+                }
+            }
+
+            WindowEvent::Focused(focused) => {
+                state.on_focus_changed(focused);
+            }
+
+            WindowEvent::MouseInput {
+                state: button_state,
+                button,
+                ..
+            } => {
+                state.on_mouse_button(
+                    button,
+                    button_state == ElementState::Pressed,
+                );
+            }
+
             _ => {}
+        }
+    }
+
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: DeviceId,
+        event: DeviceEvent,
+    ) {
+        if let DeviceEvent::MouseMotion { delta } = event
+            && let Some(state) = &mut self.state
+        {
+            state.on_mouse_motion(delta);
         }
     }
 }

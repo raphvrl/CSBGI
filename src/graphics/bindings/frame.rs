@@ -66,7 +66,7 @@ impl FrameGpu {
         let view_projection = projection * view;
 
         let uniforms = FrameUniforms {
-            view_projection: view_projection,
+            view_projection,
             camera_position: camera.position,
             _pad: 0.0,
         };
