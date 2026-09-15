@@ -9,7 +9,7 @@ use crate::{
     graphics::{
         GraphicsContext, Vertex,
         builder::{RenderPassExt, RenderPipelineExt},
-        targets::DepthTarget,
+        targets::{DepthTarget, MSAA_SAMPLES},
     },
 };
 
@@ -21,6 +21,7 @@ pub struct MeshDraw {
 
 pub struct GeometryPassInput<'a> {
     pub color_view: &'a wgpu::TextureView,
+    pub resolve_view: &'a wgpu::TextureView,
     pub depth_view: &'a wgpu::TextureView,
     pub frame_bind_group: &'a wgpu::BindGroup,
     pub object_bind_group: &'a wgpu::BindGroup,
@@ -69,6 +70,11 @@ impl GeometryPass {
                 stencil: Default::default(),
                 bias: Default::default(),
             })
+            .multisample(wgpu::MultisampleState {
+                count: MSAA_SAMPLES,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            })
             .build();
 
         Self { pipeline }
@@ -79,6 +85,7 @@ impl GeometryPass {
             .render_pass_builder()
             .label("Geometry Render Pass")
             .color(input.color_view)
+            .resolve(input.resolve_view)
             .clear(wgpu::Color::BLACK)
             .depth(input.depth_view)
             .clear(1.0)

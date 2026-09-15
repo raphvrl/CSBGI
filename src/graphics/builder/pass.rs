@@ -89,6 +89,17 @@ impl<'encoder> RenderPassBuilder<'encoder> {
         self
     }
 
+    pub fn resolve(mut self, view: &'encoder wgpu::TextureView) -> Self {
+        match self.active_attachment {
+            Some(ActiveAttachment::Color(index)) => {
+                self.color_attachment_mut(index).resolve_target = Some(view);
+            }
+            _ => panic!("RenderPassBuilder: resolve requires a color attachment"),
+        }
+
+        self
+    }
+
     pub fn load(mut self) -> Self {
         match self.active_attachment {
             Some(ActiveAttachment::Color(index)) => {

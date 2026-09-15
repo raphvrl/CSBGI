@@ -1,5 +1,7 @@
 use crate::graphics::GraphicsContext;
 
+use super::MSAA_SAMPLES;
+
 pub struct DepthTarget {
     #[allow(dead_code)]
     texture: wgpu::Texture,
@@ -22,7 +24,7 @@ impl DepthTarget {
                 depth_or_array_layers: 1,
             },
             mip_level_count: 1,
-            sample_count: 1,
+            sample_count: MSAA_SAMPLES,
             dimension: wgpu::TextureDimension::D2,
             format: Self::FORMAT,
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,

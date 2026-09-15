@@ -18,11 +18,12 @@ use crate::graphics::{
     context::GraphicsContext,
     mipmap::MipmapGenerator,
     pass::{GeometryPass, GeometryPassInput, MeshDraw},
-    targets::DepthTarget,
+    targets::{DepthTarget, MsaaTarget},
 };
 
 pub struct State {
     graphics: GraphicsContext,
+    msaa_target: MsaaTarget,
     depth_target: DepthTarget,
 
     camera: Camera,
@@ -49,6 +50,7 @@ pub struct State {
 impl State {
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         let graphics = GraphicsContext::new(&window).await?;
+        let msaa_target = MsaaTarget::new(&graphics, graphics.width(), graphics.height());
         let depth_target = DepthTarget::new(&graphics, graphics.width(), graphics.height());
         let debug = DebugUi::new(&graphics, window.as_ref());
 
@@ -97,6 +99,7 @@ impl State {
 
         Ok(Self {
             graphics,
+            msaa_target,
             depth_target,
 
             camera,
@@ -122,6 +125,7 @@ impl State {
 
     pub fn resize(&mut self, width: u32, height: u32) {
         self.graphics.resize(width, height);
+        self.msaa_target.resize(&self.graphics, width, height);
         self.depth_target.resize(&self.graphics, width, height);
         self.camera.resize(width, height);
     }
@@ -184,11 +188,13 @@ impl State {
         });
 
         let depth_view = self.depth_target.view();
+        let msaa_view = self.msaa_target.view();
 
         self.geometry_pass.record(
             &mut encoder,
             GeometryPassInput {
-                color_view: &surface_view,
+                color_view: msaa_view,
+                resolve_view: &surface_view,
                 depth_view,
                 frame_bind_group: self.frame_gpu.bind_group(),
                 object_bind_group: self.object_gpu.bind_group(),
