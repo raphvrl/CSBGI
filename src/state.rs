@@ -7,12 +7,12 @@ use winit::{
 
 use std::sync::Arc;
 
-use crate::assets::MeshAssets;
+use crate::assets::{AssetLoader, MeshAssets, upload_scene};
 use crate::camera::{Camera, CameraController, Projection};
 use crate::clock::Clock;
+use crate::ecs::scene::spawn_scene;
 use crate::ecs::{MeshRenderer, Transform};
 use crate::graphics::{
-    Mesh,
     bindings::{FrameGpu, ObjectGpu},
     context::GraphicsContext,
     pass::{GeometryPass, GeometryPassInput, MeshDraw},
@@ -61,17 +61,11 @@ impl State {
 
         let mut world = hecs::World::new();
         let mut mesh_assets = MeshAssets::default();
-        let cube = mesh_assets.add(Mesh::cube(graphics.device(), 1.0));
+        let asset_loader = AssetLoader::default();
+        let scene_data = asset_loader.load("assets/models/Sponza/glTF/Sponza.gltf")?;
+        let scene_asset = upload_scene(graphics.device(), &mut mesh_assets, scene_data);
 
-        world.spawn((
-            Transform::from_xyz(-1.1, 0.0, 0.0),
-            MeshRenderer { mesh: cube },
-        ));
-
-        world.spawn((
-            Transform::from_xyz(1.1, 0.0, 0.0),
-            MeshRenderer { mesh: cube },
-        ));
+        spawn_scene(&mut world, &scene_asset);
 
         Ok(Self {
             graphics,

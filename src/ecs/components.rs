@@ -18,6 +18,16 @@ impl Transform {
         }
     }
 
+    pub fn from_matrix(matrix: Mat4) -> Self {
+        let (scale, rotation, position) = matrix.to_scale_rotation_translation();
+
+        Self {
+            position,
+            rotation,
+            scale,
+        }
+    }
+
     pub fn matrix(self) -> glam::Mat4 {
         Mat4::from_scale_rotation_translation(self.scale, self.rotation, self.position)
     }
