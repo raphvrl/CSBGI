@@ -1,19 +1,21 @@
 use wgpu::util::DeviceExt;
 
 use bytemuck::{Pod, Zeroable};
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct Vertex {
     pub position: Vec3,
     pub normal: Vec3,
+    pub uv: Vec2,
 }
 
 impl Vertex {
-    pub const ATTRIBUTES: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
+    pub const ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
         0 => Float32x3,
         1 => Float32x3,
+        2 => Float32x2
     ];
 
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
@@ -150,11 +152,11 @@ fn add_face(
 ) {
     let start = vertices.len() as u32;
 
-    vertices.extend(
-        positions
-            .into_iter()
-            .map(|position| Vertex { position, normal }),
-    );
+    vertices.extend(positions.into_iter().map(|position| Vertex {
+        position,
+        normal,
+        uv: Vec2::ZERO,
+    }));
 
     indices.extend_from_slice(&[start, start + 1, start + 2, start, start + 2, start + 3]);
 }

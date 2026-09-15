@@ -2,7 +2,10 @@ use glam::Mat4;
 use wesl::include_wesl;
 
 use crate::{
-    assets::{MeshAssets, handles::MeshHandle},
+    assets::{
+        MaterialAssets, MeshAssets,
+        handles::{MaterialHandle, MeshHandle},
+    },
     graphics::{
         GraphicsContext, Vertex,
         builder::{RenderPassExt, RenderPipelineExt},
@@ -12,6 +15,7 @@ use crate::{
 
 pub struct MeshDraw {
     pub mesh: MeshHandle,
+    pub material: MaterialHandle,
     pub model: Mat4,
 }
 
@@ -20,6 +24,7 @@ pub struct GeometryPassInput<'a> {
     pub depth_view: &'a wgpu::TextureView,
     pub frame_bind_group: &'a wgpu::BindGroup,
     pub object_bind_group: &'a wgpu::BindGroup,
+    pub material_assets: &'a MaterialAssets,
     pub mesh_draws: &'a [MeshDraw],
     pub mesh_assets: &'a MeshAssets,
 }
@@ -33,6 +38,7 @@ impl GeometryPass {
         graphics: &GraphicsContext,
         frame_layout: &wgpu::BindGroupLayout,
         object_layout: &wgpu::BindGroupLayout,
+        material_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let device = graphics.device();
 
@@ -47,6 +53,7 @@ impl GeometryPass {
             .shader(&shader)
             .bind_group_layout(frame_layout)
             .bind_group_layout(object_layout)
+            .bind_group_layout(material_layout)
             .vertex_layout(Vertex::layout())
             .color_format(graphics.surface_format())
             .depth_stencil(wgpu::DepthStencilState {
@@ -81,7 +88,11 @@ impl GeometryPass {
         rpass.set_bind_group(1, input.object_bind_group, &[]);
 
         for (instance, item) in input.mesh_draws.iter().enumerate() {
-            if let Some(mesh) = input.mesh_assets.get(item.mesh) {
+            if let (Some(mesh), Some(material)) = (
+                input.mesh_assets.get(item.mesh),
+                input.material_assets.get(item.material),
+            ) {
+                rpass.set_bind_group(2, material.bind_group(), &[]);
                 mesh.draw(&mut rpass, instance as u32);
             }
         }

@@ -1,47 +1,60 @@
-use glam::Vec3;
+use glam::{Vec2, Vec3};
 
 use crate::{
     assets::{
         data::{NodeData, SceneData},
-        handles::MeshHandle,
+        handles::{MaterialHandle, MeshHandle},
+        materials::MaterialAssets,
         meshes::MeshAssets,
     },
     graphics::{Mesh, Vertex},
 };
 
 pub struct SceneAsset {
-    pub meshes: Vec<MeshHandle>,
+    pub meshes: Vec<PrimitiveAsset>,
     pub nodes: Vec<NodeData>,
     pub roots: Vec<usize>,
+}
+
+pub struct PrimitiveAsset {
+    pub mesh: MeshHandle,
+    pub material: MaterialHandle,
 }
 
 pub fn upload_scene(
     device: &wgpu::Device,
     mesh_assets: &mut MeshAssets,
+    material_assets: &MaterialAssets,
     scene_data: SceneData,
-) -> SceneAsset {
+) -> anyhow::Result<SceneAsset> {
     let meshes = scene_data
         .meshes
         .into_iter()
-        .map(|mesh_data| {
+        .map(|mesh_data| -> anyhow::Result<PrimitiveAsset> {
+            let material = material_assets.resolve(mesh_data.material)?;
+
             let vertices = mesh_data
                 .vertices
                 .into_iter()
                 .map(|vertex| Vertex {
                     position: Vec3::from_array(vertex.position),
                     normal: Vec3::from_array(vertex.normal),
+                    uv: Vec2::from_array(vertex.uv),
                 })
                 .collect::<Vec<_>>();
 
             let mesh = Mesh::new(device, &vertices, &mesh_data.indices);
 
-            mesh_assets.add(mesh)
+            Ok(PrimitiveAsset {
+                mesh: mesh_assets.add(mesh),
+                material,
+            })
         })
-        .collect();
+        .collect::<anyhow::Result<Vec<_>>>()?;
 
-    SceneAsset {
+    Ok(SceneAsset {
         meshes,
         nodes: scene_data.nodes,
         roots: scene_data.roots,
-    }
+    })
 }

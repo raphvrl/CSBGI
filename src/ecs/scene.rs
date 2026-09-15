@@ -17,11 +17,14 @@ fn spawn_node(world: &mut World, scene: &SceneAsset, node_index: usize, parent_t
     let world_transform = parent_transform * node.transform;
 
     for &mesh_index in &node.meshes {
-        let mesh = scene.meshes[mesh_index];
+        let primitive = &scene.meshes[mesh_index];
 
         world.spawn((
             Transform::from_matrix(world_transform),
-            MeshRenderer { mesh },
+            MeshRenderer {
+                mesh: primitive.mesh,
+                material: primitive.material,
+            },
         ));
     }
 

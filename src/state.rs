@@ -7,7 +7,7 @@ use winit::{
 
 use std::sync::Arc;
 
-use crate::assets::{AssetLoader, MeshAssets, upload_scene};
+use crate::assets::{AssetLoader, MaterialAssets, MeshAssets, TextureAssets, upload_scene};
 use crate::camera::{Camera, CameraController, Projection};
 use crate::clock::Clock;
 use crate::ecs::scene::spawn_scene;
@@ -32,6 +32,11 @@ pub struct State {
 
     world: hecs::World,
     mesh_assets: MeshAssets,
+
+    #[allow(dead_code)]
+    texture_assets: TextureAssets,
+    material_assets: MaterialAssets,
+
     mesh_draws: Vec<MeshDraw>,
     geometry_pass: GeometryPass,
 
@@ -56,14 +61,29 @@ impl State {
 
         let frame_gpu = FrameGpu::new(&graphics);
 
-        let object_gpu = ObjectGpu::new(&graphics);
-        let geometry_pass = GeometryPass::new(&graphics, frame_gpu.layout(), object_gpu.layout());
-
         let mut world = hecs::World::new();
         let mut mesh_assets = MeshAssets::default();
         let asset_loader = AssetLoader::default();
         let scene_data = asset_loader.load("assets/models/Sponza/glTF/Sponza.gltf")?;
-        let scene_asset = upload_scene(graphics.device(), &mut mesh_assets, scene_data);
+
+        let texture_assets = TextureAssets::from_images(&graphics, &scene_data.images)?;
+        let material_assets =
+            MaterialAssets::from_data(&graphics, &scene_data.materials, &texture_assets)?;
+
+        let object_gpu = ObjectGpu::new(&graphics);
+        let geometry_pass = GeometryPass::new(
+            &graphics,
+            frame_gpu.layout(),
+            object_gpu.layout(),
+            material_assets.layout(),
+        );
+
+        let scene_asset = upload_scene(
+            graphics.device(),
+            &mut mesh_assets,
+            &material_assets,
+            scene_data,
+        )?;
 
         spawn_scene(&mut world, &scene_asset);
 
@@ -80,6 +100,10 @@ impl State {
 
             world,
             mesh_assets,
+
+            texture_assets,
+            material_assets,
+
             mesh_draws: Vec::new(),
             geometry_pass,
 
@@ -108,6 +132,7 @@ impl State {
             .iter()
             .map(|(transform, renderer)| MeshDraw {
                 mesh: renderer.mesh,
+                material: renderer.material,
                 model: transform.matrix(),
             })
             .collect();
@@ -148,6 +173,7 @@ impl State {
                 depth_view,
                 frame_bind_group: self.frame_gpu.bind_group(),
                 object_bind_group: self.object_gpu.bind_group(),
+                material_assets: &self.material_assets,
                 mesh_draws: &self.mesh_draws,
                 mesh_assets: &self.mesh_assets,
             },

@@ -1,6 +1,6 @@
 use glam::Mat4;
 
-use crate::assets::handles::MeshHandle;
+use crate::assets::handles::{MaterialHandle, MeshHandle};
 
 #[derive(Clone, Copy)]
 pub struct Transform {
@@ -35,4 +35,5 @@ impl Transform {
 
 pub struct MeshRenderer {
     pub mesh: MeshHandle,
+    pub material: MaterialHandle,
 }
