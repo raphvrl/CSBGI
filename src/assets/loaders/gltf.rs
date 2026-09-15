@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result, anyhow, bail};
 use glam::{Mat4, Quat, Vec3};
+use rayon::prelude::*;
 
 use crate::assets::data::{ImageData, MaterialData, MeshData, NodeData, SceneData, VertexData};
 
@@ -30,7 +31,7 @@ impl GltfLoader {
 
 fn read_images(images: Vec<gltf::image::Data>) -> Result<Vec<ImageData>> {
     images
-        .into_iter()
+        .into_par_iter()
         .enumerate()
         .map(|(index, image)| {
             convert_image(image).with_context(|| format!("failed to convert image {index}"))

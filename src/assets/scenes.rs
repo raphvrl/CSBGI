@@ -1,4 +1,5 @@
 use glam::{Vec2, Vec3};
+use rayon::prelude::*;
 
 use crate::{
     assets::{
@@ -21,16 +22,22 @@ pub struct PrimitiveAsset {
     pub material: MaterialHandle,
 }
 
+struct PreparedPrimitive {
+    material: MaterialHandle,
+    vertices: Vec<Vertex>,
+    indices: Vec<u32>,
+}
+
 pub fn upload_scene(
     device: &wgpu::Device,
     mesh_assets: &mut MeshAssets,
     material_assets: &MaterialAssets,
     scene_data: SceneData,
 ) -> anyhow::Result<SceneAsset> {
-    let meshes = scene_data
+    let prepared_meshes = scene_data
         .meshes
-        .into_iter()
-        .map(|mesh_data| -> anyhow::Result<PrimitiveAsset> {
+        .into_par_iter()
+        .map(|mesh_data| -> anyhow::Result<PreparedPrimitive> {
             let material = material_assets.resolve(mesh_data.material)?;
 
             let vertices = mesh_data
@@ -43,11 +50,22 @@ pub fn upload_scene(
                 })
                 .collect::<Vec<_>>();
 
-            let mesh = Mesh::new(device, &vertices, &mesh_data.indices);
+            Ok(PreparedPrimitive {
+                material,
+                vertices,
+                indices: mesh_data.indices,
+            })
+        })
+        .collect::<anyhow::Result<Vec<_>>>()?;
+
+    let meshes = prepared_meshes
+        .into_iter()
+        .map(|prepared| {
+            let mesh = Mesh::new(device, &prepared.vertices, &prepared.indices);
 
             Ok(PrimitiveAsset {
                 mesh: mesh_assets.add(mesh),
-                material,
+                material: prepared.material,
             })
         })
         .collect::<anyhow::Result<Vec<_>>>()?;

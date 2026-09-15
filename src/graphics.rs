@@ -2,6 +2,7 @@ pub mod bindings;
 pub mod builder;
 pub mod context;
 pub mod mesh;
+pub mod mipmap;
 pub mod pass;
 pub mod targets;
 pub mod texture;

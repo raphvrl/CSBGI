@@ -79,12 +79,7 @@ impl GeometryPass {
             .render_pass_builder()
             .label("Geometry Render Pass")
             .color(input.color_view)
-            .clear(wgpu::Color {
-                r: 0.1,
-                g: 0.2,
-                b: 0.3,
-                a: 1.0,
-            })
+            .clear(wgpu::Color::BLACK)
             .depth(input.depth_view)
             .clear(1.0)
             .build();

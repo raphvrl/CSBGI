@@ -16,6 +16,7 @@ use crate::ecs::{MeshRenderer, Transform};
 use crate::graphics::{
     bindings::{FrameGpu, ObjectGpu},
     context::GraphicsContext,
+    mipmap::MipmapGenerator,
     pass::{GeometryPass, GeometryPassInput, MeshDraw},
     targets::DepthTarget,
 };
@@ -69,7 +70,11 @@ impl State {
         let asset_loader = AssetLoader::default();
         let scene_data = asset_loader.load("assets/models/Sponza/glTF/Sponza.gltf")?;
 
-        let texture_assets = TextureAssets::from_images(&graphics, &scene_data.images)?;
+        let mipmap_generator = MipmapGenerator::new(graphics.device());
+
+        let texture_assets =
+            TextureAssets::from_images(&graphics, &mipmap_generator, &scene_data.images)?;
+
         let material_assets =
             MaterialAssets::from_data(&graphics, &scene_data.materials, &texture_assets)?;
 

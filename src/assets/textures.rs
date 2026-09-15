@@ -5,7 +5,7 @@ use crate::{
         data::{ImageData, ImageIndex},
         handles::TextureHandle,
     },
-    graphics::{GraphicsContext, Texture},
+    graphics::{GraphicsContext, Texture, mipmap::MipmapGenerator},
 };
 
 pub struct TextureAssets {
@@ -15,7 +15,18 @@ pub struct TextureAssets {
 }
 
 impl TextureAssets {
-    pub fn from_images(graphics: &GraphicsContext, images: &[ImageData]) -> Result<Self> {
+    pub fn from_images(
+        graphics: &GraphicsContext,
+        mipmap_generator: &MipmapGenerator,
+        images: &[ImageData],
+    ) -> Result<Self> {
+        let mut encoder =
+            graphics
+                .device()
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Texture Upload Encoder"),
+                });
+
         let white_texture = Texture::from_rgba8(
             graphics.device(),
             graphics.queue(),
@@ -24,6 +35,7 @@ impl TextureAssets {
             1,
             &[255, 255, 255, 255],
         )?;
+        mipmap_generator.generate(graphics.device(), &mut encoder, &white_texture);
 
         let mut assets = Self {
             textures: vec![white_texture],
@@ -40,10 +52,13 @@ impl TextureAssets {
                 image.height,
                 &image.rgba8,
             )?;
+            mipmap_generator.generate(graphics.device(), &mut encoder, &texture);
 
             let handle = assets.add(texture);
             assets.image_handles.push(handle);
         }
+
+        graphics.queue().submit(Some(encoder.finish()));
 
         Ok(assets)
     }
