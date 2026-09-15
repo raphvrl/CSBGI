@@ -7,10 +7,16 @@ use winit::{
 
 use std::sync::Arc;
 
+use crate::assets::MeshAssets;
 use crate::camera::{Camera, CameraController, Projection};
 use crate::clock::Clock;
+use crate::ecs::{MeshRenderer, Transform};
 use crate::graphics::{
-    bindings::FrameGpu, context::GraphicsContext, pass::MeshPass, targets::DepthTarget,
+    Mesh,
+    bindings::{FrameGpu, ObjectGpu},
+    context::GraphicsContext,
+    pass::{GeometryPass, GeometryPassInput, MeshDraw},
+    targets::DepthTarget,
 };
 
 pub struct State {
@@ -22,8 +28,12 @@ pub struct State {
     clock: Clock,
 
     frame_gpu: FrameGpu,
+    object_gpu: ObjectGpu,
 
-    mesh_pass: MeshPass,
+    world: hecs::World,
+    mesh_assets: MeshAssets,
+    mesh_draws: Vec<MeshDraw>,
+    geometry_pass: GeometryPass,
 
     window: Arc<Window>,
 }
@@ -46,7 +56,22 @@ impl State {
 
         let frame_gpu = FrameGpu::new(&graphics);
 
-        let mesh_pass = MeshPass::new(&graphics, frame_gpu.layout());
+        let object_gpu = ObjectGpu::new(&graphics);
+        let geometry_pass = GeometryPass::new(&graphics, frame_gpu.layout(), object_gpu.layout());
+
+        let mut world = hecs::World::new();
+        let mut mesh_assets = MeshAssets::default();
+        let cube = mesh_assets.add(Mesh::cube(graphics.device(), 1.0));
+
+        world.spawn((
+            Transform::from_xyz(-1.1, 0.0, 0.0),
+            MeshRenderer { mesh: cube },
+        ));
+
+        world.spawn((
+            Transform::from_xyz(1.1, 0.0, 0.0),
+            MeshRenderer { mesh: cube },
+        ));
 
         Ok(Self {
             graphics,
@@ -57,8 +82,12 @@ impl State {
             clock,
 
             frame_gpu,
+            object_gpu,
 
-            mesh_pass,
+            world,
+            mesh_assets,
+            mesh_draws: Vec::new(),
+            geometry_pass,
 
             window,
         })
@@ -76,6 +105,26 @@ impl State {
 
         self.camera_ctrl.update(&mut self.camera, dt);
         self.frame_gpu.update(self.graphics.queue(), &self.camera);
+    }
+
+    pub fn prepare(&mut self) {
+        self.mesh_draws = self
+            .world
+            .query::<(&Transform, &MeshRenderer)>()
+            .iter()
+            .map(|(transform, renderer)| MeshDraw {
+                mesh: renderer.mesh,
+                model: transform.matrix(),
+            })
+            .collect();
+
+        let models = self
+            .mesh_draws
+            .iter()
+            .map(|draw| draw.model)
+            .collect::<Vec<_>>();
+
+        self.object_gpu.update(&self.graphics, &models);
     }
 
     pub fn render(&mut self) -> anyhow::Result<()> {
@@ -98,11 +147,16 @@ impl State {
 
         let depth_view = self.depth_target.view();
 
-        self.mesh_pass.record(
+        self.geometry_pass.record(
             &mut encoder,
-            &surface_view,
-            &depth_view,
-            self.frame_gpu.bind_group(),
+            GeometryPassInput {
+                color_view: &surface_view,
+                depth_view,
+                frame_bind_group: self.frame_gpu.bind_group(),
+                object_bind_group: self.object_gpu.bind_group(),
+                mesh_draws: &self.mesh_draws,
+                mesh_assets: &self.mesh_assets,
+            },
         );
 
         queue.submit(std::iter::once(encoder.finish()));
@@ -125,15 +179,11 @@ impl State {
     }
 
     pub fn on_mouse_button(&mut self, button: MouseButton, pressed: bool) {
-        if button != MouseButton::Right {
+        if button != MouseButton::Right || !pressed {
             return;
         }
 
-        if pressed {
-            self.capture_cursor();
-        } else {
-            self.release_cursor();
-        }
+        self.capture_cursor();
     }
 
     pub fn on_focus_changed(&mut self, focused: bool) {

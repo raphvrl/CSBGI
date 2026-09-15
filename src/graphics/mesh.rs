@@ -135,10 +135,10 @@ impl Mesh {
         Self::new(device, &vertices, &indices)
     }
 
-    pub fn draw<'rpass>(&'rpass self, render_pass: &mut wgpu::RenderPass<'rpass>) {
-        render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-        render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
-        render_pass.draw_indexed(0..self.index_count, 0, 0..1);
+    pub fn draw<'rpass>(&'rpass self, rpass: &mut wgpu::RenderPass<'rpass>, instance: u32) {
+        rpass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        rpass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        rpass.draw_indexed(0..self.index_count, 0, instance..instance + 1);
     }
 }
 

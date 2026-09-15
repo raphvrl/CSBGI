@@ -4,5 +4,5 @@ fn build_shader(module: &str, artifact: &str) {
 }
 
 fn main() {
-    build_shader("package::triangle", "triangle");
+    build_shader("package::geometry", "geometry");
 }

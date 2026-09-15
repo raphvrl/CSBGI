@@ -1,0 +1,89 @@
+use glam::Mat4;
+use wesl::include_wesl;
+
+use crate::{
+    assets::{MeshAssets, handles::MeshHandle},
+    graphics::{
+        GraphicsContext, Vertex,
+        builder::{RenderPassExt, RenderPipelineExt},
+        targets::DepthTarget,
+    },
+};
+
+pub struct MeshDraw {
+    pub mesh: MeshHandle,
+    pub model: Mat4,
+}
+
+pub struct GeometryPassInput<'a> {
+    pub color_view: &'a wgpu::TextureView,
+    pub depth_view: &'a wgpu::TextureView,
+    pub frame_bind_group: &'a wgpu::BindGroup,
+    pub object_bind_group: &'a wgpu::BindGroup,
+    pub mesh_draws: &'a [MeshDraw],
+    pub mesh_assets: &'a MeshAssets,
+}
+
+pub struct GeometryPass {
+    pipeline: wgpu::RenderPipeline,
+}
+
+impl GeometryPass {
+    pub fn new(
+        graphics: &GraphicsContext,
+        frame_layout: &wgpu::BindGroupLayout,
+        object_layout: &wgpu::BindGroupLayout,
+    ) -> Self {
+        let device = graphics.device();
+
+        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
+            label: Some("Geometry Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_wesl!("geometry").into()),
+        });
+
+        let pipeline = device
+            .render_pipeline_builder()
+            .label("Geometry Pipeline")
+            .shader(&shader)
+            .bind_group_layout(frame_layout)
+            .bind_group_layout(object_layout)
+            .vertex_layout(Vertex::layout())
+            .color_format(graphics.surface_format())
+            .depth_stencil(wgpu::DepthStencilState {
+                format: DepthTarget::FORMAT,
+                depth_write_enabled: Some(true),
+                depth_compare: Some(wgpu::CompareFunction::Less),
+                stencil: Default::default(),
+                bias: Default::default(),
+            })
+            .build();
+
+        Self { pipeline }
+    }
+
+    pub fn record(&self, encoder: &mut wgpu::CommandEncoder, input: GeometryPassInput<'_>) {
+        let mut rpass = encoder
+            .render_pass_builder()
+            .label("Geometry Render Pass")
+            .color(input.color_view)
+            .clear(wgpu::Color {
+                r: 0.1,
+                g: 0.2,
+                b: 0.3,
+                a: 1.0,
+            })
+            .depth(input.depth_view)
+            .clear(1.0)
+            .build();
+
+        rpass.set_pipeline(&self.pipeline);
+        rpass.set_bind_group(0, input.frame_bind_group, &[]);
+        rpass.set_bind_group(1, input.object_bind_group, &[]);
+
+        for (instance, item) in input.mesh_draws.iter().enumerate() {
+            if let Some(mesh) = input.mesh_assets.get(item.mesh) {
+                mesh.draw(&mut rpass, instance as u32);
+            }
+        }
+    }
+}

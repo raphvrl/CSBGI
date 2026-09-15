@@ -69,6 +69,7 @@ impl ApplicationHandler for App {
 
             WindowEvent::RedrawRequested => {
                 state.update();
+                state.prepare();
                 match state.render() {
                     Ok(_) => {}
                     Err(e) => {
@@ -94,10 +95,7 @@ impl ApplicationHandler for App {
                 button,
                 ..
             } => {
-                state.on_mouse_button(
-                    button,
-                    button_state == ElementState::Pressed,
-                );
+                state.on_mouse_button(button, button_state == ElementState::Pressed);
             }
 
             _ => {}

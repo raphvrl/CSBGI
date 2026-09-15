@@ -1,3 +1,3 @@
-pub mod mesh;
+pub mod geometry;
 
-pub use mesh::MeshPass;
+pub use geometry::{GeometryPass, GeometryPassInput, MeshDraw};

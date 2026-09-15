@@ -58,32 +58,59 @@ impl<'device> BindGroupLayoutBuilder<'device> {
         self
     }
 
-    pub fn uniform(mut self) -> Self {
-        self.set_type(wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Uniform,
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        });
+    pub fn uniform(self) -> Self {
+        self.buffer(wgpu::BufferBindingType::Uniform)
+    }
+
+    pub fn storage(self) -> Self {
+        self.buffer(wgpu::BufferBindingType::Storage { read_only: false })
+    }
+
+    pub fn storage_read_only(self) -> Self {
+        self.storage().read_only()
+    }
+
+    pub fn read_only(mut self) -> Self {
+        let entry = self.active_entry_mut();
+
+        match entry.ty.as_mut() {
+            Some(wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only },
+                ..
+            }) => *read_only = true,
+            Some(wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                ..
+            }) => {}
+            _ => panic!("BindGroupLayoutBuilder: read_only requires a buffer binding"),
+        }
 
         self
     }
 
-    pub fn storage(mut self) -> Self {
-        self.set_type(wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Storage { read_only: false },
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        });
+    pub fn read_write(mut self) -> Self {
+        let entry = self.active_entry_mut();
+
+        match entry.ty.as_mut() {
+            Some(wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Storage { read_only },
+                ..
+            }) => *read_only = false,
+            _ => panic!("BindGroupLayoutBuilder: read_write requires a storage buffer binding"),
+        }
 
         self
     }
 
-    pub fn storage_read_only(mut self) -> Self {
-        self.set_type(wgpu::BindingType::Buffer {
-            ty: wgpu::BufferBindingType::Storage { read_only: true },
-            has_dynamic_offset: false,
-            min_binding_size: None,
-        });
+    pub fn dynamic_offset(mut self) -> Self {
+        let entry = self.active_entry_mut();
+
+        match entry.ty.as_mut() {
+            Some(wgpu::BindingType::Buffer {
+                has_dynamic_offset, ..
+            }) => *has_dynamic_offset = true,
+            _ => panic!("BindGroupLayoutBuilder: dynamic_offset requires a buffer binding"),
+        }
 
         self
     }
@@ -208,6 +235,16 @@ impl<'device> BindGroupLayoutBuilder<'device> {
         }
 
         entry.ty = Some(ty);
+    }
+
+    fn buffer(mut self, ty: wgpu::BufferBindingType) -> Self {
+        self.set_type(wgpu::BindingType::Buffer {
+            ty,
+            has_dynamic_offset: false,
+            min_binding_size: None,
+        });
+
+        self
     }
 
     fn active_entry_mut(&mut self) -> &mut LayoutEntry {
