@@ -1,6 +1,6 @@
 use anyhow::Result;
 use winit::{
-    event::MouseButton,
+    event::{MouseButton, WindowEvent},
     keyboard::KeyCode,
     window::{CursorGrabMode, Window, WindowId},
 };
@@ -10,6 +10,7 @@ use std::sync::Arc;
 use crate::assets::{AssetLoader, MaterialAssets, MeshAssets, TextureAssets, upload_scene};
 use crate::camera::{Camera, CameraController, Projection};
 use crate::clock::Clock;
+use crate::debug::{DebugSnapshot, DebugUi};
 use crate::ecs::scene::spawn_scene;
 use crate::ecs::{MeshRenderer, Transform};
 use crate::graphics::{
@@ -39,6 +40,7 @@ pub struct State {
 
     mesh_draws: Vec<MeshDraw>,
     geometry_pass: GeometryPass,
+    debug: DebugUi,
 
     window: Arc<Window>,
 }
@@ -47,6 +49,7 @@ impl State {
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         let graphics = GraphicsContext::new(&window).await?;
         let depth_target = DepthTarget::new(&graphics, graphics.width(), graphics.height());
+        let debug = DebugUi::new(&graphics, window.as_ref());
 
         let aspect_ratio = graphics.width() as f32 / graphics.height() as f32;
 
@@ -106,6 +109,7 @@ impl State {
 
             mesh_draws: Vec::new(),
             geometry_pass,
+            debug,
 
             window,
         })
@@ -144,6 +148,16 @@ impl State {
             .collect::<Vec<_>>();
 
         self.object_gpu.update(&self.graphics, &models);
+
+        self.debug.prepare(
+            self.window.as_ref(),
+            DebugSnapshot {
+                delta_time: self.clock.delta_time(),
+                mesh_count: self.mesh_draws.len(),
+                draw_count: self.mesh_draws.len(),
+                camera_position: self.camera.position,
+            },
+        );
     }
 
     pub fn render(&mut self) -> anyhow::Result<()> {
@@ -179,6 +193,14 @@ impl State {
             },
         );
 
+        self.debug.render(
+            device,
+            queue,
+            &mut encoder,
+            &surface_view,
+            [self.graphics.width(), self.graphics.height()],
+        );
+
         queue.submit(std::iter::once(encoder.finish()));
         queue.present(output);
 
@@ -186,6 +208,11 @@ impl State {
     }
 
     pub fn on_key(&mut self, key: KeyCode, pressed: bool) {
+        if key == KeyCode::F1 && pressed {
+            self.debug.toggle_visibility();
+            return;
+        }
+
         if key == KeyCode::Escape && pressed {
             self.release_cursor();
             return;
@@ -195,7 +222,12 @@ impl State {
     }
 
     pub fn on_mouse_motion(&mut self, delta: (f64, f64)) {
+        self.debug.on_mouse_motion(delta);
         self.camera_ctrl.on_mouse_motion(delta);
+    }
+
+    pub fn on_window_event(&mut self, event: &WindowEvent) -> bool {
+        self.debug.on_window_event(self.window.as_ref(), event)
     }
 
     pub fn on_mouse_button(&mut self, button: MouseButton, pressed: bool) {

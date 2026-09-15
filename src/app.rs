@@ -58,6 +58,8 @@ impl ApplicationHandler for App {
             return;
         }
 
+        let egui_consumed = state.on_window_event(&event);
+
         match event {
             WindowEvent::CloseRequested => {
                 event_loop.exit();
@@ -80,7 +82,7 @@ impl ApplicationHandler for App {
             }
 
             WindowEvent::KeyboardInput { event, .. } => {
-                if let PhysicalKey::Code(key) = event.physical_key {
+                if !egui_consumed && let PhysicalKey::Code(key) = event.physical_key {
                     let pressed = event.state == ElementState::Pressed;
                     state.on_key(key, pressed);
                 }
@@ -94,7 +96,7 @@ impl ApplicationHandler for App {
                 state: button_state,
                 button,
                 ..
-            } => {
+            } if !egui_consumed => {
                 state.on_mouse_button(button, button_state == ElementState::Pressed);
             }
 

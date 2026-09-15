@@ -55,6 +55,12 @@ impl GeometryPass {
             .bind_group_layout(object_layout)
             .bind_group_layout(material_layout)
             .vertex_layout(Vertex::layout())
+            .primitive(wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList,
+                front_face: wgpu::FrontFace::Ccw,
+                cull_mode: Some(wgpu::Face::Back),
+                ..Default::default()
+            })
             .color_format(graphics.surface_format())
             .depth_stencil(wgpu::DepthStencilState {
                 format: DepthTarget::FORMAT,

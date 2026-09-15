@@ -13,7 +13,7 @@ impl GraphicsContext {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
-            backends: wgpu::Backends::VULKAN,
+            backends: wgpu::Backends::PRIMARY,
             flags: Default::default(),
             memory_budget_thresholds: Default::default(),
             backend_options: Default::default(),
@@ -47,16 +47,29 @@ impl GraphicsContext {
         let surface_format = surface_caps
             .formats
             .iter()
-            .find(|f| f.is_srgb())
+            .find(|format| format.is_srgb())
             .copied()
             .unwrap_or(surface_caps.formats[0]);
+
+        let present_mode = if surface_caps
+            .present_modes
+            .contains(&wgpu::PresentMode::Immediate)
+        {
+            wgpu::PresentMode::Immediate
+        } else {
+            tracing::warn!(
+                "Immediate present mode is not supported; using {:?}",
+                surface_caps.present_modes[0]
+            );
+            surface_caps.present_modes[0]
+        };
 
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
             format: surface_format,
             width: size.width,
             height: size.height,
-            present_mode: surface_caps.present_modes[0],
+            present_mode,
             alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
