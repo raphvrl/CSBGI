@@ -17,9 +17,12 @@ struct Frame {
     view_projection: mat4x4<f32>,
     light_view_projection: mat4x4<f32>,
     camera_position: vec3<f32>,
+
     pad0: f32,
+
     light_direction: vec3<f32>,
     light_intensity: f32,
+
     light_color: vec3<f32>,
     ambient: f32,
 };
@@ -93,12 +96,29 @@ fn vs_main(in: VertexInput, @builtin(instance_index) instance: u32) -> VertexOut
     return out;
 }
 
+const SHADOW_MAP_SIZE: f32 = 4096.0;
+const SHADOW_TEXEL_SIZE: f32 = 1.0 / SHADOW_MAP_SIZE;
+
+fn shadow_sample(
+    uv: vec2<f32>,
+    depth: f32,
+    offset: vec2<f32>,
+) -> f32 {
+    return textureSampleCompare(
+        shadow_map,
+        shadow_sampler,
+        uv + offset * SHADOW_TEXEL_SIZE,
+        depth,
+    );
+}
+
 fn shadow_visibility(light_position: vec4<f32>) -> f32 {
     if light_position.w <= 0.0 {
         return 1.0;
     }
 
     let light_ndc = light_position.xyz / light_position.w;
+
     let shadow_uv = vec2<f32>(
         light_ndc.x * 0.5 + 0.5,
         -light_ndc.y * 0.5 + 0.5,
@@ -110,12 +130,23 @@ fn shadow_visibility(light_position: vec4<f32>) -> f32 {
         return 1.0;
     }
 
-    return textureSampleCompare(
-        shadow_map,
-        shadow_sampler,
-        shadow_uv,
-        light_ndc.z,
-    );
+    let depth = light_ndc.z;
+
+    var visibility = 0.0;
+
+    visibility += shadow_sample(shadow_uv, depth, vec2<f32>(-1.0, -1.0));
+    visibility += shadow_sample(shadow_uv, depth, vec2<f32>(0.0, -1.0));
+    visibility += shadow_sample(shadow_uv, depth, vec2<f32>(1.0, -1.0));
+
+    visibility += shadow_sample(shadow_uv, depth, vec2<f32>(-1.0, 0.0));
+    visibility += shadow_sample(shadow_uv, depth, vec2<f32>(0.0, 0.0));
+    visibility += shadow_sample(shadow_uv, depth, vec2<f32>(1.0, 0.0));
+
+    visibility += shadow_sample(shadow_uv, depth, vec2<f32>(-1.0, 1.0));
+    visibility += shadow_sample(shadow_uv, depth, vec2<f32>(0.0, 1.0));
+    visibility += shadow_sample(shadow_uv, depth, vec2<f32>(1.0, 1.0));
+
+    return visibility / 9.0;
 }
 
 fn sample_normal_map(uv: vec2<f32>) -> vec3<f32> {
