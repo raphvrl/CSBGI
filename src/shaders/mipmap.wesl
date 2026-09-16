@@ -30,6 +30,14 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 }
 
 @fragment
-fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_color(in: VertexOutput) -> @location(0) vec4<f32> {
     return textureSample(source_texture, source_sampler, in.uv);
+}
+
+@fragment
+fn fs_normal(in: VertexOutput) -> @location(0) vec4<f32> {
+    let encoded_normal = textureSample(source_texture, source_sampler, in.uv);
+    let normal = normalize(encoded_normal.xyz * 2.0 - 1.0);
+
+    return vec4<f32>(normal * 0.5 + 0.5, encoded_normal.a);
 }

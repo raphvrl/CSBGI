@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 
 use bytemuck::{Pod, Zeroable};
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -9,13 +9,15 @@ pub struct Vertex {
     pub position: Vec3,
     pub normal: Vec3,
     pub uv: Vec2,
+    pub tangent: Vec4,
 }
 
 impl Vertex {
-    pub const ATTRIBUTES: [wgpu::VertexAttribute; 3] = wgpu::vertex_attr_array![
+    pub const ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
         0 => Float32x3,
         1 => Float32x3,
-        2 => Float32x2
+        2 => Float32x2,
+        3 => Float32x4
     ];
 
     pub fn layout() -> wgpu::VertexBufferLayout<'static> {
@@ -156,7 +158,19 @@ fn add_face(
         position,
         normal,
         uv: Vec2::ZERO,
+        tangent: tangent_from_normal(normal),
     }));
 
     indices.extend_from_slice(&[start, start + 1, start + 2, start, start + 2, start + 3]);
+}
+
+fn tangent_from_normal(normal: Vec3) -> Vec4 {
+    let reference = if normal.y.abs() < 0.999 {
+        Vec3::Y
+    } else {
+        Vec3::X
+    };
+    let tangent = normal.cross(reference).normalize_or_zero();
+
+    Vec4::new(tangent.x, tangent.y, tangent.z, 1.0)
 }

@@ -93,8 +93,12 @@ impl State {
 
         let mipmap_generator = MipmapGenerator::new(graphics.device());
 
-        let texture_assets =
-            TextureAssets::from_images(&graphics, &mipmap_generator, &scene_data.images)?;
+        let texture_assets = TextureAssets::from_images(
+            &graphics,
+            &mipmap_generator,
+            &scene_data.images,
+            &scene_data.materials,
+        )?;
 
         let material_assets =
             MaterialAssets::from_data(&graphics, &scene_data.materials, &texture_assets)?;

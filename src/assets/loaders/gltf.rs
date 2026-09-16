@@ -112,10 +112,13 @@ fn read_materials(document: &gltf::Document) -> Vec<MaterialData> {
             let color_image = pbr
                 .base_color_texture()
                 .map(|info| info.texture().source().index());
+            let normal = material.normal_texture();
 
             MaterialData {
                 color_factor: pbr.base_color_factor(),
                 color_image,
+                normal_image: normal.as_ref().map(|info| info.texture().source().index()),
+                normal_scale: normal.as_ref().map(|info| info.scale()).unwrap_or(1.0),
             }
         })
         .collect()
@@ -222,6 +225,10 @@ fn read_primitive(
         .into_f32()
         .collect::<Vec<_>>();
 
+    let tangents = reader
+        .read_tangents()
+        .map(|tangents| tangents.collect::<Vec<_>>());
+
     if positions.len() != normals.len() {
         bail!("positions and normals have different lengths");
     }
@@ -230,14 +237,29 @@ fn read_primitive(
         bail!("positions and uvs have different lengths");
     }
 
+    if let Some(tangents) = &tangents {
+        if positions.len() != tangents.len() {
+            bail!("positions and tangents have different lengths");
+        }
+    }
+
     let vertices = positions
         .into_iter()
         .zip(normals)
         .zip(uvs)
-        .map(|((position, normal), uv)| VertexData {
-            position,
-            normal,
-            uv,
+        .enumerate()
+        .map(|(index, ((position, normal), uv))| {
+            let tangent = tangents
+                .as_ref()
+                .and_then(|tangents| tangents.get(index).copied())
+                .unwrap_or_else(|| fallback_tangent(normal));
+
+            VertexData {
+                position,
+                normal,
+                uv,
+                tangent,
+            }
         })
         .collect::<Vec<_>>();
 
@@ -257,4 +279,21 @@ fn read_primitive(
         indices,
         material,
     })
+}
+
+fn fallback_tangent(normal: [f32; 3]) -> [f32; 4] {
+    let normal = Vec3::from_array(normal).normalize_or_zero();
+    let reference = if normal.y.abs() < 0.999 {
+        Vec3::Y
+    } else {
+        Vec3::X
+    };
+    let tangent = normal.cross(reference).normalize_or_zero();
+    let tangent = if tangent == Vec3::ZERO {
+        Vec3::X
+    } else {
+        tangent
+    };
+
+    [tangent.x, tangent.y, tangent.z, 1.0]
 }

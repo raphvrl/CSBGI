@@ -8,6 +8,7 @@ pub struct VertexData {
     pub position: [f32; 3],
     pub normal: [f32; 3],
     pub uv: [f32; 2],
+    pub tangent: [f32; 4],
 }
 
 #[derive(Debug)]
@@ -21,6 +22,8 @@ pub struct ImageData {
 pub struct MaterialData {
     pub color_factor: [f32; 4],
     pub color_image: Option<ImageIndex>,
+    pub normal_image: Option<ImageIndex>,
+    pub normal_scale: f32,
 }
 
 #[derive(Debug)]

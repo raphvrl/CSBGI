@@ -10,6 +10,7 @@ use crate::graphics::{
 #[derive(Clone, Copy, Pod, Zeroable)]
 struct MaterialUniform {
     base_color_factor: [f32; 4],
+    normal_scale: [f32; 4],
 }
 
 pub struct MaterialLayout {
@@ -30,6 +31,9 @@ impl MaterialLayout {
                 .texture()
                 .fragment()
             .entry(2)
+                .texture()
+                .fragment()
+            .entry(3)
                 .sampler()
                 .fragment()
             .build();
@@ -51,11 +55,16 @@ impl MaterialGpu {
     pub fn new(
         graphics: &GraphicsContext,
         layout: &MaterialLayout,
-        texture: &Texture,
+        color_texture: &Texture,
+        normal_texture: &Texture,
         base_color_factor: [f32; 4],
+        normal_scale: f32,
     ) -> Self {
         let device = graphics.device();
-        let uniform = MaterialUniform { base_color_factor };
+        let uniform = MaterialUniform {
+            base_color_factor,
+            normal_scale: [normal_scale, 0.0, 0.0, 0.0],
+        };
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Material Uniform Buffer"),
@@ -70,9 +79,11 @@ impl MaterialGpu {
             .entry(0)
             .buffer(&buffer)
             .entry(1)
-            .texture(texture.view())
+            .texture(color_texture.view())
             .entry(2)
-            .sampler(texture.sampler())
+            .texture(normal_texture.view())
+            .entry(3)
+            .sampler(color_texture.sampler())
             .build();
 
         Self {

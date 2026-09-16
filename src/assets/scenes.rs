@@ -1,4 +1,4 @@
-use glam::{Vec2, Vec3};
+use glam::{Vec2, Vec3, Vec4};
 use rayon::prelude::*;
 
 use crate::{
@@ -47,6 +47,7 @@ pub fn upload_scene(
                     position: Vec3::from_array(vertex.position),
                     normal: Vec3::from_array(vertex.normal),
                     uv: Vec2::from_array(vertex.uv),
+                    tangent: Vec4::from_array(vertex.tangent),
                 })
                 .collect::<Vec<_>>();
 

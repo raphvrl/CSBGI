@@ -4,6 +4,7 @@ pub struct Texture {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     sampler: wgpu::Sampler,
+    format: wgpu::TextureFormat,
     mip_level_count: u32,
 }
 
@@ -15,6 +16,7 @@ impl Texture {
         width: u32,
         height: u32,
         data: &[u8],
+        format: wgpu::TextureFormat,
     ) -> Result<Self> {
         if width == 0 || height == 0 {
             bail!("texture dimensions must be greater than zero");
@@ -47,7 +49,7 @@ impl Texture {
             mip_level_count,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
-            format: wgpu::TextureFormat::Rgba8UnormSrgb,
+            format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING
                 | wgpu::TextureUsages::COPY_DST
                 | wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -87,6 +89,7 @@ impl Texture {
             texture,
             view,
             sampler,
+            format,
             mip_level_count,
         })
     }
@@ -101,6 +104,10 @@ impl Texture {
 
     pub fn sampler(&self) -> &wgpu::Sampler {
         &self.sampler
+    }
+
+    pub(crate) fn format(&self) -> wgpu::TextureFormat {
+        self.format
     }
 
     pub fn create_view(&self, descriptor: &wgpu::TextureViewDescriptor) -> wgpu::TextureView {

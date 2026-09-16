@@ -6,7 +6,8 @@ use crate::graphics::{
 };
 
 pub struct MipmapGenerator {
-    pipeline: wgpu::RenderPipeline,
+    color_pipeline: wgpu::RenderPipeline,
+    normal_pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
 }
@@ -30,12 +31,22 @@ impl MipmapGenerator {
                 .fragment()
             .build();
 
-        let pipeline = device
+        let color_pipeline = device
             .render_pipeline_builder()
-            .label("Mipmap Pipeline")
+            .label("Color Mipmap Pipeline")
             .shader(&shader)
             .bind_group_layout(&bind_group_layout)
+            .fragment_entry_point("fs_color")
             .color_format(wgpu::TextureFormat::Rgba8UnormSrgb)
+            .build();
+
+        let normal_pipeline = device
+            .render_pipeline_builder()
+            .label("Normal Mipmap Pipeline")
+            .shader(&shader)
+            .bind_group_layout(&bind_group_layout)
+            .fragment_entry_point("fs_normal")
+            .color_format(wgpu::TextureFormat::Rgba8Unorm)
             .build();
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
@@ -50,7 +61,8 @@ impl MipmapGenerator {
         });
 
         Self {
-            pipeline,
+            color_pipeline,
+            normal_pipeline,
             bind_group_layout,
             sampler,
         }
@@ -62,10 +74,17 @@ impl MipmapGenerator {
         encoder: &mut wgpu::CommandEncoder,
         texture: &Texture,
     ) {
+        let format = texture.format();
+        let pipeline = match format {
+            wgpu::TextureFormat::Rgba8UnormSrgb => &self.color_pipeline,
+            wgpu::TextureFormat::Rgba8Unorm => &self.normal_pipeline,
+            format => panic!("unsupported mipmap texture format {format:?}"),
+        };
+
         for level in 1..texture.mip_level_count() {
             let source_view = texture.create_view(&wgpu::TextureViewDescriptor {
                 label: Some("Mipmap Source View"),
-                format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
+                format: Some(format),
                 dimension: Some(wgpu::TextureViewDimension::D2),
                 usage: Some(wgpu::TextureUsages::TEXTURE_BINDING),
                 aspect: wgpu::TextureAspect::All,
@@ -77,7 +96,7 @@ impl MipmapGenerator {
 
             let target_view = texture.create_view(&wgpu::TextureViewDescriptor {
                 label: Some("Mipmap Target View"),
-                format: Some(wgpu::TextureFormat::Rgba8UnormSrgb),
+                format: Some(format),
                 dimension: Some(wgpu::TextureViewDimension::D2),
                 usage: Some(wgpu::TextureUsages::RENDER_ATTACHMENT),
                 aspect: wgpu::TextureAspect::All,
@@ -106,7 +125,7 @@ impl MipmapGenerator {
                 .store()
                 .build();
 
-            rpass.set_pipeline(&self.pipeline);
+            rpass.set_pipeline(pipeline);
             rpass.set_bind_group(0, &bind_group, &[]);
             rpass.draw(0..3, 0..1);
         }
