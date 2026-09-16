@@ -8,7 +8,7 @@ use winit::{event::WindowEvent, window::Window};
 use crate::graphics::{
     GraphicsContext,
     lighting::DirectionalLight,
-    pass::{EguiPass, EguiPassInput},
+    pass::egui::{EguiPass, EguiPassInput},
 };
 
 pub use data::DebugSnapshot;

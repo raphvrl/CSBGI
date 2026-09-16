@@ -129,10 +129,6 @@ impl<'device> RenderPipelineBuilder<'device> {
             .shader
             .expect("RenderPipelineBuilder: shader is required");
 
-        let color_format = self
-            .color_format
-            .expect("RenderPipelineBuilder: color format is required");
-
         let generated_layout = if self.layout.is_none() {
             Some(
                 self.device
@@ -148,21 +144,26 @@ impl<'device> RenderPipelineBuilder<'device> {
 
         let layout = self.layout.or(generated_layout.as_ref());
 
-        let targets = [Some(wgpu::ColorTargetState {
-            format: color_format,
-            blend: self.blend,
-            write_mask: self.write_mask,
-        })];
+        let targets = self.color_format.map(|format| {
+            [Some(wgpu::ColorTargetState {
+                format,
+                blend: self.blend,
+                write_mask: self.write_mask,
+            })]
+        });
 
-        let fragment =
-            self.fragment_entry_point
-                .as_deref()
-                .map(|entry_point| wgpu::FragmentState {
-                    module: shader,
-                    entry_point: Some(entry_point),
-                    compilation_options: Default::default(),
-                    targets: &targets,
-                });
+        let fragment = self.fragment_entry_point.as_deref().map(|entry_point| {
+            let targets = targets
+                .as_ref()
+                .expect("a fragment shader requires a color format");
+
+            wgpu::FragmentState {
+                module: shader,
+                entry_point: Some(entry_point),
+                compilation_options: Default::default(),
+                targets: targets.as_slice(),
+            }
+        });
 
         self.device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {

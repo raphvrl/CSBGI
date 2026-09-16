@@ -16,22 +16,29 @@ use crate::ecs::{MeshRenderer, Transform};
 use crate::graphics::{
     bindings::{FrameGpu, ObjectGpu},
     context::GraphicsContext,
-    lighting::DirectionalLight,
+    lighting::{DirectionalLight, ShadowSettings},
     mipmap::MipmapGenerator,
-    pass::{GeometryPass, GeometryPassInput, MeshDraw},
-    targets::{DepthTarget, MsaaTarget},
+    pass::{
+        MeshDraw,
+        geometry::{GeometryPass, GeometryPassInput},
+        shadow::{ShadowPass, ShadowPassInput},
+    },
+    targets::{DepthTarget, MsaaTarget, ShadowTarget},
 };
 
 pub struct State {
     graphics: GraphicsContext,
+
     msaa_target: MsaaTarget,
     depth_target: DepthTarget,
+    shadow_target: ShadowTarget,
 
     camera: Camera,
     camera_ctrl: CameraController,
     clock: Clock,
 
     light: DirectionalLight,
+    shadow_settings: ShadowSettings,
 
     frame_gpu: FrameGpu,
     object_gpu: ObjectGpu,
@@ -44,6 +51,7 @@ pub struct State {
     material_assets: MaterialAssets,
 
     mesh_draws: Vec<MeshDraw>,
+    shadow_pass: ShadowPass,
     geometry_pass: GeometryPass,
     debug: DebugUi,
 
@@ -53,8 +61,14 @@ pub struct State {
 impl State {
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         let graphics = GraphicsContext::new(&window).await?;
-        let msaa_target = MsaaTarget::new(&graphics, graphics.width(), graphics.height());
-        let depth_target = DepthTarget::new(&graphics, graphics.width(), graphics.height());
+
+        let width = graphics.width();
+        let height = graphics.height();
+
+        let msaa_target = MsaaTarget::new(&graphics, width, height);
+        let depth_target = DepthTarget::new(&graphics, width, height);
+        let shadow_target = ShadowTarget::new(&graphics);
+
         let debug = DebugUi::new(&graphics, window.as_ref());
 
         let aspect_ratio = graphics.width() as f32 / graphics.height() as f32;
@@ -70,7 +84,7 @@ impl State {
 
         let light = DirectionalLight::default();
 
-        let frame_gpu = FrameGpu::new(&graphics);
+        let frame_gpu = FrameGpu::new(&graphics, &shadow_target);
 
         let mut world = hecs::World::new();
         let mut mesh_assets = MeshAssets::default();
@@ -86,6 +100,10 @@ impl State {
             MaterialAssets::from_data(&graphics, &scene_data.materials, &texture_assets)?;
 
         let object_gpu = ObjectGpu::new(&graphics);
+
+        let shadow_pass =
+            ShadowPass::new(&graphics, frame_gpu.shadow_layout(), object_gpu.layout());
+
         let geometry_pass = GeometryPass::new(
             &graphics,
             frame_gpu.layout(),
@@ -104,15 +122,19 @@ impl State {
 
         Ok(Self {
             graphics,
+
             msaa_target,
             depth_target,
+            shadow_target,
 
             camera,
             camera_ctrl,
             clock,
 
             light,
+            shadow_settings: ShadowSettings::default(),
 
+            shadow_pass,
             frame_gpu,
             object_gpu,
 
@@ -175,8 +197,14 @@ impl State {
             &mut self.light,
         );
 
-        self.frame_gpu
-            .update(self.graphics.queue(), &self.camera, &self.light);
+        let light_view_projection = self.light.shadow_view_projection(&self.shadow_settings);
+
+        self.frame_gpu.update(
+            self.graphics.queue(),
+            &self.camera,
+            &self.light,
+            light_view_projection,
+        );
     }
 
     pub fn render(&mut self) -> anyhow::Result<()> {
@@ -200,14 +228,29 @@ impl State {
         let depth_view = self.depth_target.view();
         let msaa_view = self.msaa_target.view();
 
+        let frame_bind_group = self.frame_gpu.bind_group();
+        let shadow_frame_bind_group = self.frame_gpu.shadow_bind_group();
+        let object_bind_group = self.object_gpu.bind_group();
+
+        self.shadow_pass.record(
+            &mut encoder,
+            ShadowPassInput {
+                shadow_view: self.shadow_target.view(),
+                frame_bind_group: shadow_frame_bind_group,
+                object_bind_group,
+                mesh_draws: &self.mesh_draws,
+                mesh_assets: &self.mesh_assets,
+            },
+        );
+
         self.geometry_pass.record(
             &mut encoder,
             GeometryPassInput {
                 color_view: msaa_view,
                 resolve_view: &surface_view,
                 depth_view,
-                frame_bind_group: self.frame_gpu.bind_group(),
-                object_bind_group: self.object_gpu.bind_group(),
+                frame_bind_group,
+                object_bind_group,
                 material_assets: &self.material_assets,
                 mesh_draws: &self.mesh_draws,
                 mesh_assets: &self.mesh_assets,

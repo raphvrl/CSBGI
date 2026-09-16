@@ -1,5 +1,5 @@
 pub mod egui;
 pub mod geometry;
+pub mod shadow;
 
-pub use egui::{EguiPass, EguiPassInput};
-pub use geometry::{GeometryPass, GeometryPassInput, MeshDraw};
+pub use geometry::MeshDraw;

@@ -131,20 +131,48 @@ impl<'device> BindGroupLayoutBuilder<'device> {
         self
     }
 
-    pub fn comparison_sampler(mut self) -> Self {
-        self.set_type(wgpu::BindingType::Sampler(
-            wgpu::SamplerBindingType::Comparison,
-        ));
+    pub fn comparison_sampler(self) -> Self {
+        self.sampler().comparison()
+    }
+
+    pub fn comparison(mut self) -> Self {
+        let entry = self.active_entry_mut();
+
+        match entry.ty.as_mut() {
+            Some(wgpu::BindingType::Sampler(sampler_type)) => {
+                *sampler_type = wgpu::SamplerBindingType::Comparison;
+            }
+            _ => {
+                panic!("BindGroupLayoutBuilder: comparison requires a sampler binding");
+            }
+        }
 
         self
     }
 
-    pub fn texture(self) -> Self {
-        self.texture_with(
-            wgpu::TextureSampleType::Float { filterable: true },
-            wgpu::TextureViewDimension::D2,
-            false,
-        )
+    pub fn texture(mut self) -> Self {
+        self.set_type(wgpu::BindingType::Texture {
+            sample_type: wgpu::TextureSampleType::Float { filterable: true },
+            view_dimension: wgpu::TextureViewDimension::D2,
+            multisampled: false,
+        });
+
+        self
+    }
+
+    pub fn depth(mut self) -> Self {
+        let entry = self.active_entry_mut();
+
+        match entry.ty.as_mut() {
+            Some(wgpu::BindingType::Texture { sample_type, .. }) => {
+                *sample_type = wgpu::TextureSampleType::Depth;
+            }
+            _ => {
+                panic!("BindGroupLayoutBuilder: depth requires a texture binding");
+            }
+        }
+
+        self
     }
 
     pub fn texture_with(

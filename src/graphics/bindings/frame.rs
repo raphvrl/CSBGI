@@ -8,6 +8,7 @@ use crate::{
         GraphicsContext,
         builder::{BindGroupExt, BindGroupLayoutExt},
         lighting::DirectionalLight,
+        targets::ShadowTarget,
     },
 };
 
@@ -15,6 +16,7 @@ use crate::{
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct FrameUniforms {
     pub view_projection: Mat4,
+    pub light_view_projection: Mat4,
     pub camera_position: Vec3,
     pub _pad0: f32,
     pub light_direction: Vec3,
@@ -26,11 +28,13 @@ pub struct FrameUniforms {
 pub struct FrameGpu {
     layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
+    shadow_layout: wgpu::BindGroupLayout,
+    shadow_bind_group: wgpu::BindGroup,
     buffer: wgpu::Buffer,
 }
 
 impl FrameGpu {
-    pub fn new(graphics: &GraphicsContext) -> Self {
+    pub fn new(graphics: &GraphicsContext, shadow_target: &ShadowTarget) -> Self {
         let device = graphics.device();
 
         #[rustfmt::skip]
@@ -41,6 +45,23 @@ impl FrameGpu {
                 .uniform()
                 .vertex()
                 .fragment()
+            .entry(1)
+                .texture()
+                .depth()
+                .fragment()
+            .entry(2)
+                .sampler()
+                .comparison()
+                .fragment()
+            .build();
+
+        #[rustfmt::skip]
+        let shadow_layout = device
+            .bind_group_layout_builder()
+            .label("Shadow Frame Bind Group Layout")
+            .entry(0)
+                .uniform()
+                .vertex()
             .build();
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -56,22 +77,44 @@ impl FrameGpu {
             .layout(&layout)
             .entry(0)
                 .buffer(&buffer)
+            .entry(1)
+                .texture(shadow_target.view())
+            .entry(2)
+                .sampler(shadow_target.sampler())
+            .build();
+
+        #[rustfmt::skip]
+        let shadow_bind_group = device
+            .bind_group_builder()
+            .label("Shadow Frame Bind Group")
+            .layout(&shadow_layout)
+            .entry(0)
+                .buffer(&buffer)
             .build();
 
         Self {
             layout,
             bind_group,
+            shadow_layout,
+            shadow_bind_group,
             buffer,
         }
     }
 
-    pub fn update(&self, queue: &wgpu::Queue, camera: &Camera, light: &DirectionalLight) {
+    pub fn update(
+        &self,
+        queue: &wgpu::Queue,
+        camera: &Camera,
+        light: &DirectionalLight,
+        light_view_projection: Mat4,
+    ) {
         let view = camera.view_matrix();
         let projection = camera.projection_matrix();
         let view_projection = projection * view;
 
         let uniforms = FrameUniforms {
             view_projection,
+            light_view_projection,
             camera_position: camera.position,
             _pad0: 0.0,
             light_direction: light.direction,
@@ -89,5 +132,13 @@ impl FrameGpu {
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
+    }
+
+    pub fn shadow_layout(&self) -> &wgpu::BindGroupLayout {
+        &self.shadow_layout
+    }
+
+    pub fn shadow_bind_group(&self) -> &wgpu::BindGroup {
+        &self.shadow_bind_group
     }
 }
