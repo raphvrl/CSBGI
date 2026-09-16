@@ -32,13 +32,20 @@ impl MaterialAssets {
         let flat_normal_texture = textures
             .get(textures.flat_normal())
             .ok_or_else(|| anyhow!("default flat normal texture is missing"))?;
+        let default_orm_texture = textures
+            .get(textures.default_orm())
+            .ok_or_else(|| anyhow!("default ORM texture is missing"))?;
 
         let default = MaterialGpu::new(
             graphics,
             &layout,
             white_texture,
             flat_normal_texture,
+            default_orm_texture,
             [1.0; 4],
+            1.0,
+            0.0,
+            1.0,
             1.0,
         );
 
@@ -58,20 +65,31 @@ impl MaterialAssets {
                 Some(image) => textures.normal(image)?,
                 None => textures.flat_normal(),
             };
+            let orm_handle = match material.orm_image {
+                Some(image) => textures.orm(image)?,
+                None => textures.default_orm(),
+            };
             let color_texture = textures
                 .get(color_handle)
                 .ok_or_else(|| anyhow!("resolved texture handle is invalid"))?;
             let normal_texture = textures
                 .get(normal_handle)
                 .ok_or_else(|| anyhow!("resolved normal texture handle is invalid"))?;
+            let orm_texture = textures
+                .get(orm_handle)
+                .ok_or_else(|| anyhow!("resolved ORM texture handle is invalid"))?;
 
             let gpu_material = MaterialGpu::new(
                 graphics,
                 &assets.layout,
                 color_texture,
                 normal_texture,
+                orm_texture,
                 material.color_factor,
                 material.normal_scale,
+                material.metallic_factor,
+                material.roughness_factor,
+                material.occlusion_factor,
             );
 
             let handle = MaterialHandle::new(assets.materials.len());

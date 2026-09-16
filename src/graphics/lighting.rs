@@ -71,6 +71,6 @@ impl DirectionalLight {
 
 impl Default for DirectionalLight {
     fn default() -> Self {
-        Self::new(Vec3::new(-1.0, -1.0, -1.0).normalize(), Vec3::ONE, 1.0, 0.1)
+        Self::new(Vec3::new(-1.0, -1.0, -1.0).normalize(), Vec3::ONE, 5.0, 0.1)
     }
 }

@@ -113,11 +113,19 @@ fn read_materials(document: &gltf::Document) -> Vec<MaterialData> {
                 .base_color_texture()
                 .map(|info| info.texture().source().index());
             let normal = material.normal_texture();
+            let occlusion = material.occlusion_texture();
+            let orm_image = pbr
+                .metallic_roughness_texture()
+                .map(|info| info.texture().source().index());
 
             MaterialData {
                 color_factor: pbr.base_color_factor(),
+                metallic_factor: pbr.metallic_factor(),
+                roughness_factor: pbr.roughness_factor(),
+                occlusion_factor: occlusion.as_ref().map(|info| info.strength()).unwrap_or(1.0),
                 color_image,
                 normal_image: normal.as_ref().map(|info| info.texture().source().index()),
+                orm_image,
                 normal_scale: normal.as_ref().map(|info| info.scale()).unwrap_or(1.0),
             }
         })
@@ -237,10 +245,10 @@ fn read_primitive(
         bail!("positions and uvs have different lengths");
     }
 
-    if let Some(tangents) = &tangents {
-        if positions.len() != tangents.len() {
-            bail!("positions and tangents have different lengths");
-        }
+    if let Some(tangents) = &tangents
+        && positions.len() != tangents.len()
+    {
+        bail!("positions and tangents have different lengths");
     }
 
     let vertices = positions

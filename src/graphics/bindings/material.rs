@@ -11,6 +11,7 @@ use crate::graphics::{
 struct MaterialUniform {
     base_color_factor: [f32; 4],
     normal_scale: [f32; 4],
+    pbr_factors: [f32; 4],
 }
 
 pub struct MaterialLayout {
@@ -34,6 +35,9 @@ impl MaterialLayout {
                 .texture()
                 .fragment()
             .entry(3)
+                .texture()
+                .fragment()
+            .entry(4)
                 .sampler()
                 .fragment()
             .build();
@@ -57,13 +61,18 @@ impl MaterialGpu {
         layout: &MaterialLayout,
         color_texture: &Texture,
         normal_texture: &Texture,
+        orm_texture: &Texture,
         base_color_factor: [f32; 4],
         normal_scale: f32,
+        metallic_factor: f32,
+        roughness_factor: f32,
+        occlusion_factor: f32,
     ) -> Self {
         let device = graphics.device();
         let uniform = MaterialUniform {
             base_color_factor,
             normal_scale: [normal_scale, 0.0, 0.0, 0.0],
+            pbr_factors: [metallic_factor, roughness_factor, occlusion_factor, 0.0],
         };
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -83,6 +92,8 @@ impl MaterialGpu {
             .entry(2)
             .texture(normal_texture.view())
             .entry(3)
+            .texture(orm_texture.view())
+            .entry(4)
             .sampler(color_texture.sampler())
             .build();
 

@@ -7,6 +7,7 @@ use crate::graphics::{
 
 pub struct MipmapGenerator {
     color_pipeline: wgpu::RenderPipeline,
+    linear_pipeline: wgpu::RenderPipeline,
     normal_pipeline: wgpu::RenderPipeline,
     bind_group_layout: wgpu::BindGroupLayout,
     sampler: wgpu::Sampler,
@@ -49,6 +50,15 @@ impl MipmapGenerator {
             .color_format(wgpu::TextureFormat::Rgba8Unorm)
             .build();
 
+        let linear_pipeline = device
+            .render_pipeline_builder()
+            .label("Linear Mipmap Pipeline")
+            .shader(&shader)
+            .bind_group_layout(&bind_group_layout)
+            .fragment_entry_point("fs_linear")
+            .color_format(wgpu::TextureFormat::Rgba8Unorm)
+            .build();
+
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
             label: Some("Mipmap Generation Sampler"),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
@@ -62,6 +72,7 @@ impl MipmapGenerator {
 
         Self {
             color_pipeline,
+            linear_pipeline,
             normal_pipeline,
             bind_group_layout,
             sampler,
@@ -81,6 +92,33 @@ impl MipmapGenerator {
             format => panic!("unsupported mipmap texture format {format:?}"),
         };
 
+        self.generate_with_pipeline(device, encoder, texture, format, pipeline);
+    }
+
+    pub fn generate_linear(
+        &self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        texture: &Texture,
+    ) {
+        let format = texture.format();
+        let pipeline = match format {
+            wgpu::TextureFormat::Rgba8UnormSrgb => &self.color_pipeline,
+            wgpu::TextureFormat::Rgba8Unorm => &self.linear_pipeline,
+            format => panic!("unsupported mipmap texture format {format:?}"),
+        };
+
+        self.generate_with_pipeline(device, encoder, texture, format, pipeline);
+    }
+
+    fn generate_with_pipeline(
+        &self,
+        device: &wgpu::Device,
+        encoder: &mut wgpu::CommandEncoder,
+        texture: &Texture,
+        format: wgpu::TextureFormat,
+        pipeline: &wgpu::RenderPipeline,
+    ) {
         for level in 1..texture.mip_level_count() {
             let source_view = texture.create_view(&wgpu::TextureViewDescriptor {
                 label: Some("Mipmap Source View"),

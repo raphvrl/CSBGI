@@ -57,7 +57,11 @@ fn show_directional_light(ui: &mut Ui, light: &mut DirectionalLight) {
         ));
         ui.small("Direction is normalized in the shader.");
 
-        ui.add(egui::Slider::new(&mut light.intensity, 0.0..=5.0).text("Intensity"));
+        ui.add(
+            egui::DragValue::new(&mut light.intensity)
+                .speed(0.1)
+                .prefix("Intensity: "),
+        );
         ui.add(egui::Slider::new(&mut light.ambient, 0.0..=1.0).text("Ambient"));
 
         let mut color = light.color.to_array();

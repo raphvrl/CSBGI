@@ -21,8 +21,12 @@ pub struct ImageData {
 #[derive(Debug)]
 pub struct MaterialData {
     pub color_factor: [f32; 4],
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub occlusion_factor: f32,
     pub color_image: Option<ImageIndex>,
     pub normal_image: Option<ImageIndex>,
+    pub orm_image: Option<ImageIndex>,
     pub normal_scale: f32,
 }
 

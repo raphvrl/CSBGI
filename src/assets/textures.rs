@@ -13,8 +13,10 @@ pub struct TextureAssets {
     textures: Vec<Texture>,
     color_handles: Vec<TextureHandle>,
     normal_handles: Vec<Option<TextureHandle>>,
+    orm_handles: Vec<Option<TextureHandle>>,
     white: TextureHandle,
     flat_normal: TextureHandle,
+    default_orm: TextureHandle,
 }
 
 impl TextureAssets {
@@ -53,17 +55,34 @@ impl TextureAssets {
         )?;
         mipmap_generator.generate(graphics.device(), &mut encoder, &flat_normal_texture);
 
+        let default_orm_texture = Texture::from_rgba8(
+            graphics.device(),
+            graphics.queue(),
+            "Default ORM Texture",
+            1,
+            1,
+            &[255, 255, 0, 255],
+            wgpu::TextureFormat::Rgba8Unorm,
+        )?;
+        mipmap_generator.generate_linear(graphics.device(), &mut encoder, &default_orm_texture);
+
         let normal_images = materials
             .iter()
             .filter_map(|material| material.normal_image)
             .collect::<HashSet<_>>();
+        let orm_images = materials
+            .iter()
+            .filter_map(|material| material.orm_image)
+            .collect::<HashSet<_>>();
 
         let mut assets = Self {
-            textures: vec![white_texture, flat_normal_texture],
+            textures: vec![white_texture, flat_normal_texture, default_orm_texture],
             color_handles: Vec::with_capacity(images.len()),
             normal_handles: vec![None; images.len()],
+            orm_handles: vec![None; images.len()],
             white: TextureHandle::new(0),
             flat_normal: TextureHandle::new(1),
+            default_orm: TextureHandle::new(2),
         };
 
         for (index, image) in images.iter().enumerate() {
@@ -95,6 +114,21 @@ impl TextureAssets {
 
                 assets.normal_handles[index] = Some(assets.add(normal_texture));
             }
+
+            if orm_images.contains(&index) {
+                let orm_texture = Texture::from_rgba8(
+                    graphics.device(),
+                    graphics.queue(),
+                    &format!("Asset ORM Texture {index}"),
+                    image.width,
+                    image.height,
+                    &image.rgba8,
+                    wgpu::TextureFormat::Rgba8Unorm,
+                )?;
+                mipmap_generator.generate_linear(graphics.device(), &mut encoder, &orm_texture);
+
+                assets.orm_handles[index] = Some(assets.add(orm_texture));
+            }
         }
 
         graphics.queue().submit(Some(encoder.finish()));
@@ -114,6 +148,10 @@ impl TextureAssets {
         self.flat_normal
     }
 
+    pub fn default_orm(&self) -> TextureHandle {
+        self.default_orm
+    }
+
     pub fn color(&self, index: ImageIndex) -> Result<TextureHandle> {
         self.color_handles
             .get(index)
@@ -126,6 +164,13 @@ impl TextureAssets {
             .get(index)
             .and_then(|handle| *handle)
             .ok_or_else(|| anyhow!("material references missing normal image {index}"))
+    }
+
+    pub fn orm(&self, index: ImageIndex) -> Result<TextureHandle> {
+        self.orm_handles
+            .get(index)
+            .and_then(|handle| *handle)
+            .ok_or_else(|| anyhow!("material references missing ORM image {index}"))
     }
 
     fn add(&mut self, texture: Texture) -> TextureHandle {

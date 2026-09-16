@@ -35,6 +35,11 @@ fn fs_color(in: VertexOutput) -> @location(0) vec4<f32> {
 }
 
 @fragment
+fn fs_linear(in: VertexOutput) -> @location(0) vec4<f32> {
+    return textureSample(source_texture, source_sampler, in.uv);
+}
+
+@fragment
 fn fs_normal(in: VertexOutput) -> @location(0) vec4<f32> {
     let encoded_normal = textureSample(source_texture, source_sampler, in.uv);
     let normal = normalize(encoded_normal.xyz * 2.0 - 1.0);
