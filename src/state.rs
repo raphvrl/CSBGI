@@ -14,7 +14,7 @@ use crate::debug::{DebugSnapshot, DebugUi};
 use crate::ecs::scene::spawn_scene;
 use crate::ecs::{MeshRenderer, Transform};
 use crate::graphics::{
-    bindings::{FrameGpu, ObjectGpu},
+    bindings::{FrameGpu, ObjectGpu, ToneMappingBinding},
     context::GraphicsContext,
     lighting::{DirectionalLight, ShadowSettings},
     mipmap::MipmapGenerator,
@@ -22,14 +22,15 @@ use crate::graphics::{
         MeshDraw,
         geometry::{GeometryPass, GeometryPassInput},
         shadow::{ShadowPass, ShadowPassInput},
+        tonemapping::{ToneMappingPass, ToneMappingPassInput},
     },
-    targets::{DepthTarget, MsaaTarget, ShadowTarget},
+    targets::{DepthTarget, SceneColorTarget, ShadowTarget},
 };
 
 pub struct State {
     graphics: GraphicsContext,
 
-    msaa_target: MsaaTarget,
+    scene_color_target: SceneColorTarget,
     depth_target: DepthTarget,
     shadow_target: ShadowTarget,
 
@@ -53,6 +54,8 @@ pub struct State {
     mesh_draws: Vec<MeshDraw>,
     shadow_pass: ShadowPass,
     geometry_pass: GeometryPass,
+    tonemapping_binding: ToneMappingBinding,
+    tonemapping_pass: ToneMappingPass,
     debug: DebugUi,
 
     window: Arc<Window>,
@@ -65,7 +68,7 @@ impl State {
         let width = graphics.width();
         let height = graphics.height();
 
-        let msaa_target = MsaaTarget::new(&graphics, width, height);
+        let scene_color_target = SceneColorTarget::new(&graphics, width, height);
         let depth_target = DepthTarget::new(&graphics, width, height);
         let shadow_target = ShadowTarget::new(&graphics);
 
@@ -115,6 +118,11 @@ impl State {
             material_assets.layout(),
         );
 
+        let tonemapping_binding =
+            ToneMappingBinding::new(&graphics, scene_color_target.resolve_view());
+
+        let tonemapping_pass = ToneMappingPass::new(&graphics, &tonemapping_binding);
+
         let scene_asset = upload_scene(
             graphics.device(),
             &mut mesh_assets,
@@ -127,7 +135,7 @@ impl State {
         Ok(Self {
             graphics,
 
-            msaa_target,
+            scene_color_target,
             depth_target,
             shadow_target,
 
@@ -149,7 +157,9 @@ impl State {
             material_assets,
 
             mesh_draws: Vec::new(),
+            tonemapping_binding,
             geometry_pass,
+            tonemapping_pass,
             debug,
 
             window,
@@ -158,7 +168,12 @@ impl State {
 
     pub fn resize(&mut self, width: u32, height: u32) {
         self.graphics.resize(width, height);
-        self.msaa_target.resize(&self.graphics, width, height);
+        self.scene_color_target
+            .resize(&self.graphics, width, height);
+        self.tonemapping_binding.update_source(
+            self.graphics.device(),
+            self.scene_color_target.resolve_view(),
+        );
         self.depth_target.resize(&self.graphics, width, height);
         self.camera.resize(width, height);
     }
@@ -230,7 +245,8 @@ impl State {
         });
 
         let depth_view = self.depth_target.view();
-        let msaa_view = self.msaa_target.view();
+        let msaa_view = self.scene_color_target.msaa_view();
+        let resolve_view = self.scene_color_target.resolve_view();
 
         let frame_bind_group = self.frame_gpu.bind_group();
         let shadow_frame_bind_group = self.frame_gpu.shadow_bind_group();
@@ -251,13 +267,21 @@ impl State {
             &mut encoder,
             GeometryPassInput {
                 color_view: msaa_view,
-                resolve_view: &surface_view,
+                resolve_view,
                 depth_view,
                 frame_bind_group,
                 object_bind_group,
                 material_assets: &self.material_assets,
                 mesh_draws: &self.mesh_draws,
                 mesh_assets: &self.mesh_assets,
+            },
+        );
+
+        self.tonemapping_pass.record(
+            &mut encoder,
+            ToneMappingPassInput {
+                binding: &self.tonemapping_binding,
+                target_view: &surface_view,
             },
         );
 

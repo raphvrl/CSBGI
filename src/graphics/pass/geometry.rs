@@ -9,7 +9,7 @@ use crate::{
     graphics::{
         GraphicsContext, Vertex,
         builder::{RenderPassExt, RenderPipelineExt},
-        targets::{DepthTarget, MSAA_SAMPLES},
+        targets::{DepthTarget, MSAA_SAMPLES, SceneColorTarget},
     },
 };
 
@@ -62,7 +62,7 @@ impl GeometryPass {
                 cull_mode: Some(wgpu::Face::Back),
                 ..Default::default()
             })
-            .color_format(graphics.surface_format())
+            .color_format(SceneColorTarget::FORMAT)
             .depth_stencil(wgpu::DepthStencilState {
                 format: DepthTarget::FORMAT,
                 depth_write_enabled: Some(true),

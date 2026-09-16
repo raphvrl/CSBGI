@@ -7,4 +7,5 @@ fn main() {
     build_shader("package::geometry", "geometry");
     build_shader("package::mipmap", "mipmap");
     build_shader("package::shadow", "shadow");
+    build_shader("package::tonemapping", "tonemapping");
 }
