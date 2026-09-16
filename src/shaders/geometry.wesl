@@ -6,13 +6,29 @@ struct VertexInput {
 }
 
 struct VertexOutput {
-    @builtin(position) position: vec4<f32>,
-    @location(0) normal: vec3<f32>,
-    @location(1) uv: vec2<f32>,
-    @location(2) light_position: vec4<f32>,
-    @location(3) tangent: vec4<f32>,
-    @location(4) world_position: vec3<f32>,
-};
+    @builtin(position)
+    position: vec4<f32>,
+
+    @location(0)
+    @interpolate(perspective, sample)
+    normal: vec3<f32>,
+
+    @location(1)
+    @interpolate(perspective, sample)
+    uv: vec2<f32>,
+
+    @location(2)
+    @interpolate(perspective, sample)
+    light_position: vec4<f32>,
+
+    @location(3)
+    @interpolate(perspective, sample)
+    tangent: vec4<f32>,
+
+    @location(4)
+    @interpolate(perspective, sample)
+    world_position: vec3<f32>,
+}
 
 struct Frame {
     view_projection: mat4x4<f32>,
@@ -241,8 +257,27 @@ fn fresnel_schlick(
     cos_theta: f32,
     f0: vec3<f32>,
 ) -> vec3<f32> {
-    return f0 + (vec3<f32>(1.0) - f0)
-        * pow(1.0 - cos_theta, 5.0);
+    return f0 + (vec3<f32>(1.0) - f0) * pow(1.0 - cos_theta, 5.0);
+}
+
+fn specular_aa_roughness(
+    normal: vec3<f32>,
+    roughness: f32,
+) -> f32 {
+    let dndx = dpdx(normal);
+    let dndy = dpdy(normal);
+
+    let variance = 0.15 * (dot(dndx, dndx) + dot(dndy, dndy));
+
+    let kernel_roughness2 = min(
+        2.0 * variance,
+        0.18
+    );
+
+    return min(
+        sqrt(roughness * roughness + kernel_roughness2),
+        1.0
+    );
 }
 
 fn calculate_pbr(
@@ -253,18 +288,26 @@ fn calculate_pbr(
     light_position: vec4<f32>,
 ) -> vec3<f32> {
     let occlusion = clamp(material.pbr_factors.z, 0.0, 1.0);
-    let roughness = clamp(
+
+    let base_roughness = clamp(
         orm.g * material.pbr_factors.y,
         0.04,
         1.0,
     );
+
+    let n = normalize(normal);
+
+    let roughness = specular_aa_roughness(
+        n,
+        base_roughness,
+    );
+
     let metallic = clamp(
         orm.b * material.pbr_factors.x,
         0.0,
         1.0,
     );
 
-    let n = normalize(normal);
     let v = normalize(frame.camera_position - world_position);
 
     let l = normalize(-frame.light_direction);
@@ -275,15 +318,13 @@ fn calculate_pbr(
     let n_dot_h = max(dot(n, h), 0.0);
     let h_dot_v = max(dot(h, v), 0.0);
 
-    let f0 = vec3<f32>(0.04) * (1.0 - metallic)
-                + albedo * metallic;
+    let f0 = vec3<f32>(0.04) * (1.0 - metallic) + albedo * metallic;
 
     let f = fresnel_schlick(h_dot_v, f0);
     let d = distribution_ggx(n_dot_h, roughness);
     let g = geometry_smith(n_dot_v, n_dot_l, roughness);
 
-    let specular = (d * g * f)
-                / max(4.0 * n_dot_v * n_dot_l, 0.0001);
+    let specular = (d * g * f) / max(4.0 * n_dot_v * n_dot_l, 0.0001);
 
     let diffuse_weight = (vec3<f32>(1.0) - f) * (1.0 - metallic);
 
