@@ -1,6 +1,7 @@
 pub mod bindings;
 pub mod builder;
 pub mod context;
+pub mod lighting;
 pub mod mesh;
 pub mod mipmap;
 pub mod pass;

@@ -16,6 +16,7 @@ use crate::ecs::{MeshRenderer, Transform};
 use crate::graphics::{
     bindings::{FrameGpu, ObjectGpu},
     context::GraphicsContext,
+    lighting::DirectionalLight,
     mipmap::MipmapGenerator,
     pass::{GeometryPass, GeometryPassInput, MeshDraw},
     targets::{DepthTarget, MsaaTarget},
@@ -29,6 +30,8 @@ pub struct State {
     camera: Camera,
     camera_ctrl: CameraController,
     clock: Clock,
+
+    light: DirectionalLight,
 
     frame_gpu: FrameGpu,
     object_gpu: ObjectGpu,
@@ -64,6 +67,8 @@ impl State {
         let camera = Camera::new(position, rotation, projection);
         let camera_ctrl = CameraController::new(5.0, 0.003);
         let clock = Clock::new();
+
+        let light = DirectionalLight::default();
 
         let frame_gpu = FrameGpu::new(&graphics);
 
@@ -106,6 +111,8 @@ impl State {
             camera_ctrl,
             clock,
 
+            light,
+
             frame_gpu,
             object_gpu,
 
@@ -135,7 +142,6 @@ impl State {
         let dt = self.clock.delta_time();
 
         self.camera_ctrl.update(&mut self.camera, dt);
-        self.frame_gpu.update(self.graphics.queue(), &self.camera);
     }
 
     pub fn prepare(&mut self) {
@@ -166,7 +172,11 @@ impl State {
                 draw_count: self.mesh_draws.len(),
                 camera_position: self.camera.position,
             },
+            &mut self.light,
         );
+
+        self.frame_gpu
+            .update(self.graphics.queue(), &self.camera, &self.light);
     }
 
     pub fn render(&mut self) -> anyhow::Result<()> {

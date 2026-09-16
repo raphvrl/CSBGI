@@ -7,6 +7,7 @@ use winit::{event::WindowEvent, window::Window};
 
 use crate::graphics::{
     GraphicsContext,
+    lighting::DirectionalLight,
     pass::{EguiPass, EguiPassInput},
 };
 
@@ -63,7 +64,12 @@ impl DebugUi {
         self.visible = !self.visible;
     }
 
-    pub fn prepare(&mut self, window: &Window, snapshot: DebugSnapshot) {
+    pub fn prepare(
+        &mut self,
+        window: &Window,
+        snapshot: DebugSnapshot,
+        light: &mut DirectionalLight,
+    ) {
         self.snapshot_timer += snapshot.delta_time;
 
         if self.snapshot_timer >= 0.1 || self.displayed_snapshot.delta_time == 0.0 {
@@ -77,7 +83,7 @@ impl DebugUi {
         let displayed_snapshot = self.displayed_snapshot;
 
         let output = context.run_ui(input, |ui| {
-            panels::show(ui, visible, &displayed_snapshot);
+            panels::show(ui, visible, &displayed_snapshot, light);
         });
 
         self.winit

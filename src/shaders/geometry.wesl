@@ -13,6 +13,11 @@ struct VertexOutput {
 struct Frame {
     view_projection: mat4x4<f32>,
     camera_position: vec3<f32>,
+    pad0: f32,
+    light_direction: vec3<f32>,
+    light_intensity: f32,
+    light_color: vec3<f32>,
+    ambient: f32,
 };
 
 @group(0) @binding(0)
@@ -45,7 +50,7 @@ fn vs_main(in: VertexInput, @builtin(instance_index) instance: u32) -> VertexOut
 
     var out: VertexOutput;
     out.position = view_projection * model * vec4<f32>(in.position, 1.0);
-    out.normal = in.normal;
+    out.normal = normalize((model * vec4<f32>(in.normal, 0.0)).xyz);
     out.uv = in.uv;
     return out;
 }
@@ -58,7 +63,20 @@ fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
         in.uv,
     );
 
+    let normal = normalize(in.normal);
+
+    let light_direction = normalize(frame.light_direction.xyz);
+    let surface_to_light = -light_direction;
+
+    let diffuse_factor = max(dot(normal, surface_to_light), 0.0);
+    let diffuse_intensity = frame.light_intensity * diffuse_factor;
+
+    let ambient_color = frame.light_color.rgb * frame.ambient;
+    let diffuse_color = frame.light_color.rgb * diffuse_intensity;
+
+    let lighting = ambient_color + diffuse_color;
+
     let color = texture_color * material.base_color_factor;
 
-    return color;
+    return vec4<f32>(color.rgb * lighting, color.a);
 }
