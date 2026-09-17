@@ -28,16 +28,45 @@ pub struct DirectionalLight {
     pub color: Vec3,
     pub intensity: f32,
     pub ambient: f32,
+
+    sun_rise: f32,
+    sun_yaw: f32,
 }
 
 impl DirectionalLight {
     pub fn new(direction: Vec3, color: Vec3, intensity: f32, ambient: f32) -> Self {
+        let sun_direction = -direction.normalize_or_zero();
+        let horizontal = Vec3::new(sun_direction.x, 0.0, sun_direction.z).length();
+        let rise = horizontal
+            .atan2(sun_direction.y)
+            .clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
+
         Self {
             direction,
             color,
             intensity,
             ambient,
+            sun_rise: rise,
+            sun_yaw: sun_direction.z.atan2(sun_direction.x),
         }
+    }
+
+    pub fn sun_angles(&self) -> (f32, f32) {
+        (self.sun_rise, self.sun_yaw)
+    }
+
+    pub fn set_sun_angles(&mut self, rise: f32, yaw: f32) {
+        self.sun_rise = rise.clamp(-std::f32::consts::FRAC_PI_2, std::f32::consts::FRAC_PI_2);
+        self.sun_yaw = yaw;
+
+        let horizontal = self.sun_rise.sin();
+        let sun_direction = Vec3::new(
+            horizontal * self.sun_yaw.cos(),
+            self.sun_rise.cos(),
+            horizontal * self.sun_yaw.sin(),
+        );
+
+        self.direction = -sun_direction;
     }
 
     pub fn shadow_view_projection(&self, settings: &ShadowSettings) -> Mat4 {

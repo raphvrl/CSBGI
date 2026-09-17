@@ -17,15 +17,49 @@ use crate::graphics::{
     bindings::{FrameGpu, ObjectGpu, ToneMappingBinding},
     context::GraphicsContext,
     lighting::{DirectionalLight, ShadowSettings},
+    lut::Lut,
     mipmap::MipmapGenerator,
     pass::{
         MeshDraw,
         geometry::{GeometryPass, GeometryPassInput},
+        lut::{LutPass, LutPassInput},
         shadow::{ShadowPass, ShadowPassInput},
+        sky::{SkyPass, SkyPassInput},
         tonemapping::{ToneMappingPass, ToneMappingPassInput},
     },
     targets::{DepthTarget, SceneColorTarget, ShadowTarget},
 };
+
+const LUT_UPDATE_INTERVAL: f32 = 1.0 / 15.0;
+
+struct LutKey {
+    camera_height: f32,
+    light_direction: glam::Vec3,
+    light_color: glam::Vec3,
+    light_intensity: f32,
+}
+
+impl LutKey {
+    fn new(camera_height: f32, light: &DirectionalLight) -> Self {
+        Self {
+            camera_height,
+            light_direction: light.direction,
+            light_color: light.color,
+            light_intensity: light.intensity,
+        }
+    }
+
+    fn changed(&self, other: &Self) -> bool {
+        const HEIGHT_EPSILON: f32 = 0.01;
+        const DIRECTION_EPSILON: f32 = 0.0001;
+        const VALUE_EPSILON: f32 = 0.0001;
+
+        (self.camera_height - other.camera_height).abs() > HEIGHT_EPSILON
+            || self.light_direction.distance_squared(other.light_direction) > DIRECTION_EPSILON
+            || self.light_color.distance_squared(other.light_color) > VALUE_EPSILON
+            || (self.light_intensity - other.light_intensity).abs() > VALUE_EPSILON
+    }
+}
 
 pub struct State {
     graphics: GraphicsContext,
@@ -51,8 +85,14 @@ pub struct State {
     texture_assets: TextureAssets,
     material_assets: MaterialAssets,
 
+    lut: Lut,
+    lut_pass: LutPass,
+    lut_key: Option<LutKey>,
+    lut_timer: f32,
+
     mesh_draws: Vec<MeshDraw>,
     shadow_pass: ShadowPass,
+    sky_pass: SkyPass,
     geometry_pass: GeometryPass,
     tonemapping_binding: ToneMappingBinding,
     tonemapping_pass: ToneMappingPass,
@@ -87,7 +127,9 @@ impl State {
 
         let light = DirectionalLight::default();
 
-        let frame_gpu = FrameGpu::new(&graphics, &shadow_target);
+        let lut = Lut::new(graphics.device());
+
+        let frame_gpu = FrameGpu::new(&graphics, &shadow_target, &depth_target, &lut);
 
         let mut world = hecs::World::new();
         let mut mesh_assets = MeshAssets::default();
@@ -103,6 +145,8 @@ impl State {
             &scene_data.materials,
         )?;
 
+        let lut_pass = LutPass::new(&graphics, frame_gpu.lut_layout());
+
         let material_assets =
             MaterialAssets::from_data(&graphics, &scene_data.materials, &texture_assets)?;
 
@@ -110,6 +154,8 @@ impl State {
 
         let shadow_pass =
             ShadowPass::new(&graphics, frame_gpu.shadow_layout(), object_gpu.layout());
+
+        let sky_pass = SkyPass::new(&graphics, frame_gpu.sky_layout());
 
         let geometry_pass = GeometryPass::new(
             &graphics,
@@ -156,7 +202,13 @@ impl State {
             texture_assets,
             material_assets,
 
+            lut,
+            lut_pass,
+            lut_key: None,
+            lut_timer: 0.0,
+
             mesh_draws: Vec::new(),
+            sky_pass,
             tonemapping_binding,
             geometry_pass,
             tonemapping_pass,
@@ -175,6 +227,8 @@ impl State {
             self.scene_color_target.resolve_view(),
         );
         self.depth_target.resize(&self.graphics, width, height);
+        self.frame_gpu
+            .update_depth_target(&self.graphics, &self.depth_target, &self.lut);
         self.camera.resize(width, height);
     }
 
@@ -183,6 +237,7 @@ impl State {
         let dt = self.clock.delta_time();
 
         self.camera_ctrl.update(&mut self.camera, dt);
+        self.lut_timer += dt;
     }
 
     pub fn prepare(&mut self) {
@@ -216,6 +271,20 @@ impl State {
             &mut self.light,
         );
 
+        let key = LutKey::new(self.camera.position.y, &self.light);
+
+        let initial = self.lut_key.is_none();
+        let changed = match self.lut_key.as_ref() {
+            Some(previous) => previous.changed(&key),
+            None => true,
+        };
+
+        if changed && (initial || self.lut_timer >= LUT_UPDATE_INTERVAL) {
+            self.lut.invalidate();
+            self.lut_key = Some(key);
+            self.lut_timer = 0.0;
+        }
+
         let light_view_projection = self.light.shadow_view_projection(&self.shadow_settings);
 
         self.frame_gpu.update(
@@ -245,7 +314,6 @@ impl State {
         });
 
         let depth_view = self.depth_target.view();
-        let msaa_view = self.scene_color_target.msaa_view();
         let resolve_view = self.scene_color_target.resolve_view();
 
         let frame_bind_group = self.frame_gpu.bind_group();
@@ -266,7 +334,7 @@ impl State {
         self.geometry_pass.record(
             &mut encoder,
             GeometryPassInput {
-                color_view: msaa_view,
+                color_view: self.scene_color_target.msaa_view(),
                 resolve_view,
                 depth_view,
                 frame_bind_group,
@@ -274,6 +342,26 @@ impl State {
                 material_assets: &self.material_assets,
                 mesh_draws: &self.mesh_draws,
                 mesh_assets: &self.mesh_assets,
+            },
+        );
+
+        if self.lut.needs_update() {
+            self.lut_pass.record(
+                &mut encoder,
+                LutPassInput {
+                    lut_view: self.lut.view(),
+                    frame_bind_group: self.frame_gpu.lut_bind_group(),
+                },
+            );
+
+            self.lut.mark_updated();
+        }
+
+        self.sky_pass.record(
+            &mut encoder,
+            SkyPassInput {
+                color_view: resolve_view,
+                frame_bind_group: self.frame_gpu.sky_bind_group(),
             },
         );
 

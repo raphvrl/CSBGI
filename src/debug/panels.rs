@@ -35,27 +35,30 @@ pub fn show(ui: &mut Ui, visible: bool, snapshot: &DebugSnapshot, light: &mut Di
 }
 
 fn show_directional_light(ui: &mut Ui, light: &mut DirectionalLight) {
-    ui.collapsing("Directional light", |ui| {
-        ui.label("Direction");
+    ui.collapsing("Sun", |ui| {
+        let (rise, yaw) = light.sun_angles();
+        let mut rise_degrees = rise.to_degrees();
+        let mut yaw_degrees = yaw.to_degrees();
 
-        let mut direction = light.direction.to_array();
-        let direction_changed = ui
-            .add(egui::Slider::new(&mut direction[0], -1.0..=1.0).text("X"))
+        let angles_changed = ui
+            .add(
+                egui::Slider::new(&mut rise_degrees, -90.0..=90.0)
+                    .text("Rise / set")
+                    .suffix("°"),
+            )
             .changed()
-            | ui.add(egui::Slider::new(&mut direction[1], -1.0..=1.0).text("Y"))
-                .changed()
-            | ui.add(egui::Slider::new(&mut direction[2], -1.0..=1.0).text("Z"))
-                .changed();
+            | ui.add(
+                egui::Slider::new(&mut yaw_degrees, -180.0..=180.0)
+                    .text("Yaw")
+                    .suffix("°"),
+            )
+            .changed();
 
-        if direction_changed {
-            light.direction = Vec3::from_array(direction);
+        if angles_changed {
+            light.set_sun_angles(rise_degrees.to_radians(), yaw_degrees.to_radians());
         }
 
-        ui.label(format!(
-            "Vector: ({:.2}, {:.2}, {:.2})",
-            light.direction.x, light.direction.y, light.direction.z,
-        ));
-        ui.small("Direction is normalized in the shader.");
+        ui.small("-90° = sunrise, 0° = noon, 90° = sunset");
 
         ui.add(
             egui::DragValue::new(&mut light.intensity)

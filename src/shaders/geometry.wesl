@@ -32,6 +32,7 @@ struct VertexOutput {
 
 struct Frame {
     view_projection: mat4x4<f32>,
+    inverse_view_projection: mat4x4<f32>,
     light_view_projection: mat4x4<f32>,
     camera_position: vec3<f32>,
 

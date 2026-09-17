@@ -8,7 +8,8 @@ use crate::{
         GraphicsContext,
         builder::{BindGroupExt, BindGroupLayoutExt},
         lighting::DirectionalLight,
-        targets::ShadowTarget,
+        lut::Lut,
+        targets::{DepthTarget, ShadowTarget},
     },
 };
 
@@ -16,6 +17,7 @@ use crate::{
 #[derive(Clone, Copy, Pod, Zeroable)]
 pub struct FrameUniforms {
     pub view_projection: Mat4,
+    pub inverse_view_projection: Mat4,
     pub light_view_projection: Mat4,
     pub camera_position: Vec3,
     pub _pad0: f32,
@@ -28,13 +30,22 @@ pub struct FrameUniforms {
 pub struct FrameGpu {
     layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
+    lut_layout: wgpu::BindGroupLayout,
+    lut_bind_group: wgpu::BindGroup,
+    sky_layout: wgpu::BindGroupLayout,
+    sky_bind_group: wgpu::BindGroup,
     shadow_layout: wgpu::BindGroupLayout,
     shadow_bind_group: wgpu::BindGroup,
     buffer: wgpu::Buffer,
 }
 
 impl FrameGpu {
-    pub fn new(graphics: &GraphicsContext, shadow_target: &ShadowTarget) -> Self {
+    pub fn new(
+        graphics: &GraphicsContext,
+        shadow_target: &ShadowTarget,
+        depth_target: &DepthTarget,
+        lut: &Lut,
+    ) -> Self {
         let device = graphics.device();
 
         #[rustfmt::skip]
@@ -52,6 +63,39 @@ impl FrameGpu {
             .entry(2)
                 .sampler()
                 .comparison()
+                .fragment()
+            .build();
+
+        #[rustfmt::skip]
+        let sky_layout = device
+            .bind_group_layout_builder()
+            .label("Sky Bind Group Layout")
+            .entry(0)
+                .uniform()
+                .vertex()
+                .fragment()
+            .entry(3)
+                .texture_with(
+                    wgpu::TextureSampleType::Depth,
+                    wgpu::TextureViewDimension::D2,
+                    true,
+                )
+                .fragment()
+            .entry(4)
+                .texture()
+                .fragment()
+            .entry(5)
+                .sampler()
+                .fragment()
+            .build();
+
+        #[rustfmt::skip]
+        let lut_layout = device
+            .bind_group_layout_builder()
+            .label("LUT Bind Group Layout")
+            .entry(0)
+                .uniform()
+                .vertex()
                 .fragment()
             .build();
 
@@ -84,6 +128,30 @@ impl FrameGpu {
             .build();
 
         #[rustfmt::skip]
+        let lut_bind_group = device
+            .bind_group_builder()
+            .label("LUT Bind Group")
+            .layout(&lut_layout)
+            .entry(0)
+                .buffer(&buffer)
+            .build();
+
+        #[rustfmt::skip]
+        let sky_bind_group = device
+            .bind_group_builder()
+            .label("Sky Bind Group")
+            .layout(&sky_layout)
+            .entry(0)
+                .buffer(&buffer)
+            .entry(3)
+                .texture(depth_target.view())
+            .entry(4)
+                .texture(lut.view())
+            .entry(5)
+                .sampler(lut.sampler())
+            .build();
+
+        #[rustfmt::skip]
         let shadow_bind_group = device
             .bind_group_builder()
             .label("Shadow Frame Bind Group")
@@ -95,10 +163,36 @@ impl FrameGpu {
         Self {
             layout,
             bind_group,
+            lut_layout,
+            lut_bind_group,
+            sky_layout,
+            sky_bind_group,
             shadow_layout,
             shadow_bind_group,
             buffer,
         }
+    }
+
+    pub fn update_depth_target(
+        &mut self,
+        graphics: &GraphicsContext,
+        depth_target: &DepthTarget,
+        lut: &Lut,
+    ) {
+        self.sky_bind_group = graphics
+            .device()
+            .bind_group_builder()
+            .label("Sky Bind Group")
+            .layout(&self.sky_layout)
+            .entry(0)
+            .buffer(&self.buffer)
+            .entry(3)
+            .texture(depth_target.view())
+            .entry(4)
+            .texture(lut.view())
+            .entry(5)
+            .sampler(lut.sampler())
+            .build();
     }
 
     pub fn update(
@@ -111,9 +205,11 @@ impl FrameGpu {
         let view = camera.view_matrix();
         let projection = camera.projection_matrix();
         let view_projection = projection * view;
+        let inverse_view_projection = view_projection.inverse();
 
         let uniforms = FrameUniforms {
             view_projection,
+            inverse_view_projection,
             light_view_projection,
             camera_position: camera.position,
             _pad0: 0.0,
@@ -132,6 +228,22 @@ impl FrameGpu {
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
+    }
+
+    pub fn sky_layout(&self) -> &wgpu::BindGroupLayout {
+        &self.sky_layout
+    }
+
+    pub fn lut_layout(&self) -> &wgpu::BindGroupLayout {
+        &self.lut_layout
+    }
+
+    pub fn lut_bind_group(&self) -> &wgpu::BindGroup {
+        &self.lut_bind_group
+    }
+
+    pub fn sky_bind_group(&self) -> &wgpu::BindGroup {
+        &self.sky_bind_group
     }
 
     pub fn shadow_layout(&self) -> &wgpu::BindGroupLayout {
