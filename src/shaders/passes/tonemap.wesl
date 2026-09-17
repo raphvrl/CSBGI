@@ -1,3 +1,6 @@
+import package::color::space::{rec2020_to_srgb, srgb_to_rec2020};
+import package::color::curve::tonemap;
+
 struct VertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
@@ -8,21 +11,6 @@ var scene_texture: texture_2d<f32>;
 
 @group(0) @binding(1)
 var scene_sampler: sampler;
-
-fn aces_tonemap(color: vec3<f32>) -> vec3<f32> {
-    let a = 2.51;
-    let b = 0.03;
-    let c = 2.43;
-    let d = 0.59;
-    let e = 0.14;
-
-    return clamp(
-        (color * (a * color + b)) /
-        (color * (c * color + d) + e),
-        vec3<f32>(0.0),
-        vec3<f32>(1.0),
-    );
-}
 
 @vertex
 fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
@@ -39,32 +27,21 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
     );
 
     var output: VertexOutput;
-
-    output.position = vec4<f32>(
-        positions[vertex_index],
-        0.0,
-        1.0,
-    );
-
+    output.position = vec4<f32>(positions[vertex_index], 0.0, 1.0);
     output.uv = uvs[vertex_index];
 
     return output;
 }
 
-const EXPOSURE: f32 = 1.0;
+const EXPOSURE: f32 = 2.0;
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    let scene_color = textureSample(
-        scene_texture,
-        scene_sampler,
-        input.uv,
-    );
-
+    let scene_color = textureSample(scene_texture, scene_sampler, input.uv);
     let exposed_color = scene_color.rgb * exp2(EXPOSURE);
+    let working_color = max(srgb_to_rec2020(exposed_color), vec3<f32>(0.0));
+    let mapped_color = tonemap(working_color);
+    let output_color = max(rec2020_to_srgb(mapped_color), vec3<f32>(0.0));
 
-    return vec4<f32>(
-        aces_tonemap(exposed_color),
-        scene_color.a,
-    );
+    return vec4<f32>(output_color, scene_color.a);
 }

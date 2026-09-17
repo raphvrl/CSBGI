@@ -15,16 +15,31 @@ use crate::{
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
-pub struct FrameUniforms {
+pub struct CameraUniforms {
     pub view_projection: Mat4,
     pub inverse_view_projection: Mat4,
-    pub light_view_projection: Mat4,
     pub camera_position: Vec3,
+
     pub _pad0: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub struct LightUniforms {
+    pub view_projection: Mat4,
+
     pub light_direction: Vec3,
     pub light_intensity: f32,
+
     pub light_color: Vec3,
     pub ambient_light: f32,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Pod, Zeroable)]
+pub struct FrameUniforms {
+    pub camera: CameraUniforms,
+    pub light: LightUniforms,
 }
 
 pub struct FrameGpu {
@@ -208,15 +223,19 @@ impl FrameGpu {
         let inverse_view_projection = view_projection.inverse();
 
         let uniforms = FrameUniforms {
-            view_projection,
-            inverse_view_projection,
-            light_view_projection,
-            camera_position: camera.position,
-            _pad0: 0.0,
-            light_direction: light.direction,
-            light_intensity: light.intensity,
-            light_color: light.color,
-            ambient_light: light.ambient,
+            camera: CameraUniforms {
+                view_projection,
+                inverse_view_projection,
+                camera_position: camera.position,
+                _pad0: 0.0,
+            },
+            light: LightUniforms {
+                view_projection: light_view_projection,
+                light_direction: light.direction,
+                light_intensity: light.intensity,
+                light_color: light.color,
+                ambient_light: light.ambient,
+            },
         };
 
         queue.write_buffer(&self.buffer, 0, bytemuck::bytes_of(&uniforms));

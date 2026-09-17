@@ -7,14 +7,13 @@ const RAYLEIGH_SCALE_HEIGHT_KM: f32 = 8.0;
 const VIEW_STEPS: u32 = 16u;
 const SUN_STEPS: u32 = 4u;
 
-// Rayleigh coefficients in RGB order, expressed per kilometre.
 const RAYLEIGH_BETA: vec3<f32> = vec3<f32>(
     0.0058,
     0.0135,
     0.0331,
 );
 
-fn ray_sphere_intersection(
+fn intersection(
     origin: vec3<f32>,
     direction: vec3<f32>,
     center: vec3<f32>,
@@ -31,13 +30,10 @@ fn ray_sphere_intersection(
 
     let root = sqrt(discriminant);
 
-    return vec2<f32>(
-        -b - root,
-        -b + root,
-    );
+    return vec2<f32>(-b - root, -b + root);
 }
 
-fn atmosphere_density(
+fn density(
     position: vec3<f32>,
     planet_center: vec3<f32>,
 ) -> f32 {
@@ -50,16 +46,16 @@ fn atmosphere_density(
     return exp(-altitude / RAYLEIGH_SCALE_HEIGHT_KM);
 }
 
-fn rayleigh_phase(cos_angle: f32) -> f32 {
+fn phase(cos_angle: f32) -> f32 {
     return 3.0 / (16.0 * PI) * (1.0 + cos_angle * cos_angle);
 }
 
-fn sun_optical_depth(
+fn optical_depth(
     position: vec3<f32>,
     sun_direction: vec3<f32>,
     planet_center: vec3<f32>,
 ) -> f32 {
-    let planet_hit = ray_sphere_intersection(
+    let planet_hit = intersection(
         position,
         sun_direction,
         planet_center,
@@ -70,7 +66,7 @@ fn sun_optical_depth(
         return 1000.0;
     }
 
-    let atmosphere_hit = ray_sphere_intersection(
+    let atmosphere_hit = intersection(
         position,
         sun_direction,
         planet_center,
@@ -81,19 +77,16 @@ fn sun_optical_depth(
     let end = atmosphere_hit.y;
     let step_size = (end - start) / f32(SUN_STEPS);
 
-    var optical_depth = 0.0;
+    var result = 0.0;
 
     for (var index = 0u; index < SUN_STEPS; index++) {
         let distance = start + (f32(index) + 0.5) * step_size;
         let sample_position = position + sun_direction * distance;
 
-        optical_depth += atmosphere_density(
-            sample_position,
-            planet_center,
-        ) * step_size;
+        result += density(sample_position, planet_center) * step_size;
     }
 
-    return optical_depth;
+    return result;
 }
 
 fn sun_transmittance(
@@ -101,24 +94,18 @@ fn sun_transmittance(
     light_direction_input: vec3<f32>,
 ) -> vec3<f32> {
     let camera_position = camera_position_world * 0.001;
-
     let planet_center = vec3<f32>(
         camera_position.x,
         -PLANET_RADIUS_KM,
         camera_position.z,
     );
-
     let sun_direction = normalize(-light_direction_input);
-    let optical_depth = sun_optical_depth(
-        camera_position,
-        sun_direction,
-        planet_center,
-    );
+    let depth = optical_depth(camera_position, sun_direction, planet_center);
 
-    return exp(-RAYLEIGH_BETA * optical_depth);
+    return exp(-RAYLEIGH_BETA * depth);
 }
 
-fn calculate_sky(
+fn calculate(
     ray_direction: vec3<f32>,
     camera_position_world: vec3<f32>,
     light_direction_input: vec3<f32>,
@@ -126,16 +113,14 @@ fn calculate_sky(
     light_intensity: f32,
 ) -> vec3<f32> {
     let camera_position = camera_position_world * 0.001;
-
     let planet_center = vec3<f32>(
         camera_position.x,
         -PLANET_RADIUS_KM,
         camera_position.z,
     );
-
     let sun_direction = normalize(-light_direction_input);
 
-    let atmosphere_hit = ray_sphere_intersection(
+    let atmosphere_hit = intersection(
         camera_position,
         ray_direction,
         planet_center,
@@ -149,7 +134,7 @@ fn calculate_sky(
     let start = max(atmosphere_hit.x, 0.0);
     var end = atmosphere_hit.y;
 
-    let planet_hit = ray_sphere_intersection(
+    let planet_hit = intersection(
         camera_position,
         ray_direction,
         planet_center,
@@ -167,42 +152,24 @@ fn calculate_sky(
     }
 
     let step_size = (end - start) / f32(VIEW_STEPS);
-    let phase = rayleigh_phase(
-        dot(ray_direction, sun_direction)
-    );
-    let scattering_step = RAYLEIGH_BETA
-        * phase
+    let scattering = RAYLEIGH_BETA
+        * phase(dot(ray_direction, sun_direction))
         * light_color
         * light_intensity
         * step_size;
 
-    var view_optical_depth = 0.0;
+    var view_depth = 0.0;
     var sky_color = vec3<f32>(0.0);
 
     for (var index = 0u; index < VIEW_STEPS; index++) {
         let distance = start + (f32(index) + 0.5) * step_size;
         let sample_position = camera_position + ray_direction * distance;
+        let sample_density = density(sample_position, planet_center);
+        let sun_depth = optical_depth(sample_position, sun_direction, planet_center);
+        let attenuation = exp(-RAYLEIGH_BETA * (view_depth + sun_depth));
 
-        let density = atmosphere_density(
-            sample_position,
-            planet_center,
-        );
-
-        let sun_depth = sun_optical_depth(
-            sample_position,
-            sun_direction,
-            planet_center,
-        );
-
-        let attenuation = exp(
-            -RAYLEIGH_BETA * (view_optical_depth + sun_depth)
-        );
-
-        sky_color += attenuation
-            * scattering_step
-            * density;
-
-        view_optical_depth += density * step_size;
+        sky_color += attenuation * scattering * sample_density;
+        view_depth += sample_density * step_size;
     }
 
     return sky_color;

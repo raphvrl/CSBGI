@@ -4,10 +4,10 @@ fn build_shader(module: &str, artifact: &str) {
 }
 
 fn main() {
-    build_shader("package::geometry", "geometry");
-    build_shader("package::mipmap", "mipmap");
-    build_shader("package::shadow", "shadow");
-    build_shader("package::sky", "sky");
-    build_shader("package::tonemapping", "tonemapping");
-    build_shader("package::lut", "lut");
+    build_shader("package::passes::geometry", "geometry");
+    build_shader("package::passes::mipmap", "mipmap");
+    build_shader("package::passes::shadow", "shadow");
+    build_shader("package::passes::sky", "sky");
+    build_shader("package::passes::tonemap", "tonemapping");
+    build_shader("package::passes::lut", "lut");
 }

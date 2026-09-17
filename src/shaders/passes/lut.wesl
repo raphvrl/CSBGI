@@ -1,23 +1,5 @@
-import package::atmosphere::calculate_sky;
-
-struct Frame {
-    view_projection: mat4x4<f32>,
-    inverse_view_projection: mat4x4<f32>,
-    light_view_projection: mat4x4<f32>,
-
-    camera_position: vec3<f32>,
-
-    _pad0: f32,
-
-    light_direction: vec3<f32>,
-    light_intensity: f32,
-
-    light_color: vec3<f32>,
-    ambient: f32,
-};
-
-@group(0) @binding(0)
-var<uniform> frame: Frame;
+import package::common::frame::Frame;
+import package::sky::atmosphere::calculate;
 
 struct VertexOutput {
     @builtin(position)
@@ -27,12 +9,14 @@ struct VertexOutput {
     uv: vec2<f32>,
 };
 
+@group(0) @binding(0)
+var<uniform> frame: Frame;
+
 const PI: f32 = 3.14159265359;
 
-fn direction_from_uv(uv: vec2<f32>) -> vec3<f32> {
+fn direction(uv: vec2<f32>) -> vec3<f32> {
     let theta = uv.y * PI;
     let phi = (uv.x - 0.5) * 2.0 * PI;
-
     let sin_theta = sin(theta);
 
     return normalize(vec3<f32>(
@@ -54,25 +38,19 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
     var output: VertexOutput;
     output.position = vec4<f32>(ndc, 1.0, 1.0);
-
-    output.uv = vec2<f32>(
-        ndc.x * 0.5 + 0.5,
-        0.5 - ndc.y * 0.5,
-    );
+    output.uv = vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5);
 
     return output;
 }
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    let ray_direction = direction_from_uv(input.uv);
-
-    let color = calculate_sky(
-        ray_direction,
-        frame.camera_position,
-        frame.light_direction,
-        frame.light_color,
-        frame.light_intensity,
+    let color = calculate(
+        direction(input.uv),
+        frame.camera.camera_position,
+        frame.light.light_direction,
+        frame.light.light_color,
+        frame.light.light_intensity,
     );
 
     return vec4<f32>(color, 1.0);
