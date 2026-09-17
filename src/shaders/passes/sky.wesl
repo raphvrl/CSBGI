@@ -21,7 +21,7 @@ var sky_sampler: sampler;
 const PI: f32 = 3.14159265359;
 const SUN_ANGULAR_RADIUS_RAD: f32 = 0.00465;
 const UNDER_HORIZON_COLOR: vec3<f32> = vec3<f32>(0.025, 0.035, 0.05);
-const HORIZON_BLEND_START: f32 = -0.12;
+const HORIZON_BLEND_START: f32 = -0.35;
 const HORIZON_BLEND_END: f32 = 0.05;
 
 fn direction_uv(direction: vec3<f32>) -> vec2<f32> {

@@ -7,7 +7,7 @@ use crate::graphics::{
     builder::{BindGroupExt, BindGroupLayoutExt},
 };
 
-const INITIAL_EXPOSURE: f32 = 2.0;
+const INITIAL_EXPOSURE: f32 = 0.0;
 
 #[derive(Clone, Copy)]
 pub struct ExposureSettings {
@@ -20,7 +20,7 @@ pub struct ExposureSettings {
 impl Default for ExposureSettings {
     fn default() -> Self {
         Self {
-            target_luminance: 0.18,
+            target_luminance: 0.4,
             min_exposure: -8.0,
             max_exposure: 10.0,
             adaptation_speed: 0.5,
