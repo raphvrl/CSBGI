@@ -3,7 +3,7 @@ use wesl::include_wesl;
 use crate::graphics::{
     GraphicsContext,
     builder::{RenderPassExt, RenderPipelineExt},
-    targets::SceneColorTarget,
+    targets::{MSAA_SAMPLES, SceneColorTarget},
 };
 
 pub struct SkyPass {
@@ -30,7 +30,11 @@ impl SkyPass {
             .shader(&shader)
             .bind_group_layout(frame_layout)
             .color_format(SceneColorTarget::FORMAT)
-            .blend(wgpu::BlendState::ALPHA_BLENDING)
+            .multisample(wgpu::MultisampleState {
+                count: MSAA_SAMPLES,
+                mask: !0,
+                alpha_to_coverage_enabled: false,
+            })
             .build();
 
         Self { pipeline }
@@ -41,7 +45,7 @@ impl SkyPass {
             .render_pass_builder()
             .label("Sky Render Pass")
             .color(input.color_view)
-            .load()
+            .clear(wgpu::Color::BLACK)
             .store()
             .build();
 

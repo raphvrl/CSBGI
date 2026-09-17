@@ -10,7 +10,11 @@ pub struct ToneMappingBinding {
 }
 
 impl ToneMappingBinding {
-    pub fn new(graphics: &GraphicsContext, source_view: &wgpu::TextureView) -> Self {
+    pub fn new(
+        graphics: &GraphicsContext,
+        source_view: &wgpu::TextureView,
+        exposure_buffer: &wgpu::Buffer,
+    ) -> Self {
         let device = graphics.device();
 
         #[rustfmt::skip]
@@ -22,6 +26,9 @@ impl ToneMappingBinding {
                 .fragment()
             .entry(1)
                 .sampler()
+                .fragment()
+            .entry(2)
+                .storage_read_only()
                 .fragment()
             .build();
 
@@ -36,7 +43,8 @@ impl ToneMappingBinding {
             ..Default::default()
         });
 
-        let bind_group = Self::create_bind_group(device, &layout, source_view, &sampler);
+        let bind_group =
+            Self::create_bind_group(device, &layout, source_view, &sampler, exposure_buffer);
 
         Self {
             layout,
@@ -45,8 +53,19 @@ impl ToneMappingBinding {
         }
     }
 
-    pub fn update_source(&mut self, device: &wgpu::Device, source_view: &wgpu::TextureView) {
-        self.bind_group = Self::create_bind_group(device, &self.layout, source_view, &self.sampler);
+    pub fn update_source(
+        &mut self,
+        device: &wgpu::Device,
+        source_view: &wgpu::TextureView,
+        exposure_buffer: &wgpu::Buffer,
+    ) {
+        self.bind_group = Self::create_bind_group(
+            device,
+            &self.layout,
+            source_view,
+            &self.sampler,
+            exposure_buffer,
+        );
     }
 
     pub fn layout(&self) -> &wgpu::BindGroupLayout {
@@ -62,6 +81,7 @@ impl ToneMappingBinding {
         layout: &wgpu::BindGroupLayout,
         source_view: &wgpu::TextureView,
         sampler: &wgpu::Sampler,
+        exposure_buffer: &wgpu::Buffer,
     ) -> wgpu::BindGroup {
         device
             .bind_group_builder()
@@ -71,6 +91,8 @@ impl ToneMappingBinding {
             .texture(source_view)
             .entry(1)
             .sampler(sampler)
+            .entry(2)
+            .buffer(exposure_buffer)
             .build()
     }
 }

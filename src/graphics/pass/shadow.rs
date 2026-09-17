@@ -1,7 +1,7 @@
 use wesl::include_wesl;
 
 use crate::{
-    assets::MeshAssets,
+    assets::{MaterialAssets, MeshAssets},
     graphics::{
         GraphicsContext, Vertex,
         builder::{RenderPassExt, RenderPipelineExt},
@@ -11,10 +11,14 @@ use crate::{
 
 use super::geometry::MeshDraw;
 
+const SHADOW_DEPTH_BIAS: i32 = 2;
+const SHADOW_SLOPE_SCALE: f32 = 4.0;
+
 pub struct ShadowPassInput<'a> {
     pub shadow_view: &'a wgpu::TextureView,
     pub frame_bind_group: &'a wgpu::BindGroup,
     pub object_bind_group: &'a wgpu::BindGroup,
+    pub material_assets: &'a MaterialAssets,
     pub mesh_draws: &'a [MeshDraw],
     pub mesh_assets: &'a MeshAssets,
 }
@@ -28,6 +32,7 @@ impl ShadowPass {
         graphics: &GraphicsContext,
         frame_layout: &wgpu::BindGroupLayout,
         object_layout: &wgpu::BindGroupLayout,
+        material_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let device = graphics.device();
 
@@ -42,22 +47,23 @@ impl ShadowPass {
             .shader(&shader)
             .bind_group_layout(frame_layout)
             .bind_group_layout(object_layout)
+            .bind_group_layout(material_layout)
             .vertex_layout(Vertex::layout())
             .primitive(wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
                 front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
+                // Interior and thin wall faces must also be able to cast shadows.
+                cull_mode: None,
                 ..Default::default()
             })
-            .without_fragment()
             .depth_stencil(wgpu::DepthStencilState {
                 format: ShadowTarget::FORMAT,
                 depth_write_enabled: Some(true),
                 depth_compare: Some(wgpu::CompareFunction::Less),
                 stencil: Default::default(),
                 bias: wgpu::DepthBiasState {
-                    constant: 1,
-                    slope_scale: 2.0,
+                    constant: SHADOW_DEPTH_BIAS,
+                    slope_scale: SHADOW_SLOPE_SCALE,
                     clamp: 0.0,
                 },
             })
@@ -79,7 +85,11 @@ impl ShadowPass {
         rpass.set_bind_group(1, input.object_bind_group, &[]);
 
         for (instance, draw) in input.mesh_draws.iter().enumerate() {
-            if let Some(mesh) = input.mesh_assets.get(draw.mesh) {
+            if let (Some(mesh), Some(material)) = (
+                input.mesh_assets.get(draw.mesh),
+                input.material_assets.get(draw.material),
+            ) {
+                rpass.set_bind_group(2, material.bind_group(), &[]);
                 mesh.draw(&mut rpass, instance as u32);
             }
         }

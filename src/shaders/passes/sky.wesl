@@ -1,4 +1,4 @@
-import package::common::frame::Frame;
+import package::common::frame::{Frame, lux_to_render};
 import package::sky::atmosphere::sun_transmittance;
 
 struct VertexOutput {
@@ -12,9 +12,6 @@ struct VertexOutput {
 @group(0) @binding(0)
 var<uniform> frame: Frame;
 
-@group(0) @binding(3)
-var scene_depth: texture_depth_multisampled_2d;
-
 @group(0) @binding(4)
 var sky_lut: texture_2d<f32>;
 
@@ -23,6 +20,9 @@ var sky_sampler: sampler;
 
 const PI: f32 = 3.14159265359;
 const SUN_ANGULAR_RADIUS_RAD: f32 = 0.00465;
+const UNDER_HORIZON_COLOR: vec3<f32> = vec3<f32>(0.025, 0.035, 0.05);
+const HORIZON_BLEND_START: f32 = -0.12;
+const HORIZON_BLEND_END: f32 = 0.05;
 
 fn direction_uv(direction: vec3<f32>) -> vec2<f32> {
     let theta = acos(clamp(direction.y, -1.0, 1.0));
@@ -49,21 +49,10 @@ fn sun(ray_direction: vec3<f32>) -> vec3<f32> {
         frame.light.light_direction,
     );
 
-    return disk * transmittance * frame.light.light_color * frame.light.light_intensity;
-}
-
-fn coverage(pixel: vec2<i32>) -> f32 {
-    let depth0 = textureLoad(scene_depth, pixel, 0u);
-    let depth1 = textureLoad(scene_depth, pixel, 1u);
-    let depth2 = textureLoad(scene_depth, pixel, 2u);
-    let depth3 = textureLoad(scene_depth, pixel, 3u);
-
-    let clear_samples = select(0.0, 1.0, depth0 >= 1.0)
-        + select(0.0, 1.0, depth1 >= 1.0)
-        + select(0.0, 1.0, depth2 >= 1.0)
-        + select(0.0, 1.0, depth3 >= 1.0);
-
-    return clear_samples * 0.25;
+    return disk
+        * transmittance
+        * frame.light.light_color
+        * lux_to_render(frame.light.light_illuminance_lux);
 }
 
 @vertex
@@ -87,19 +76,23 @@ fn vs_main(@builtin(vertex_index) vertex_index: u32) -> VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-    let sky_coverage = coverage(vec2<i32>(input.position.xy));
-
-    if sky_coverage <= 0.0 {
-        discard;
-    }
-
     let ray_direction = normalize(input.ray_direction);
     let sky_color = textureSample(
         sky_lut,
         sky_sampler,
         direction_uv(ray_direction),
     ).rgb;
-    let sun_color = sun(ray_direction);
+    let horizon_blend = smoothstep(
+        HORIZON_BLEND_START,
+        HORIZON_BLEND_END,
+        ray_direction.y,
+    );
+    let background_color = mix(
+        UNDER_HORIZON_COLOR,
+        sky_color,
+        horizon_blend,
+    );
+    let sun_color = sun(ray_direction) * horizon_blend;
 
-    return vec4<f32>(sky_color + sun_color, sky_coverage);
+    return vec4<f32>(background_color + sun_color, 1.0);
 }

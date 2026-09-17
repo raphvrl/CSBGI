@@ -29,10 +29,10 @@ pub struct LightUniforms {
     pub view_projection: Mat4,
 
     pub light_direction: Vec3,
-    pub light_intensity: f32,
+    pub light_illuminance_lux: f32,
 
     pub light_color: Vec3,
-    pub ambient_light: f32,
+    pub ambient_illuminance_lux: f32,
 }
 
 #[repr(C)]
@@ -232,9 +232,9 @@ impl FrameGpu {
             light: LightUniforms {
                 view_projection: light_view_projection,
                 light_direction: light.direction,
-                light_intensity: light.intensity,
+                light_illuminance_lux: light.illuminance_lux,
                 light_color: light.color,
-                ambient_light: light.ambient,
+                ambient_illuminance_lux: light.ambient_illuminance_lux,
             },
         };
 

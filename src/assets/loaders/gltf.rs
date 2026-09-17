@@ -122,7 +122,10 @@ fn read_materials(document: &gltf::Document) -> Vec<MaterialData> {
                 color_factor: pbr.base_color_factor(),
                 metallic_factor: pbr.metallic_factor(),
                 roughness_factor: pbr.roughness_factor(),
-                occlusion_factor: occlusion.as_ref().map(|info| info.strength()).unwrap_or(1.0),
+                occlusion_factor: occlusion
+                    .as_ref()
+                    .map(|info| info.strength())
+                    .unwrap_or(1.0),
                 color_image,
                 normal_image: normal.as_ref().map(|info| info.texture().source().index()),
                 orm_image,

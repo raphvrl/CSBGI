@@ -10,4 +10,7 @@ fn main() {
     build_shader("package::passes::sky", "sky");
     build_shader("package::passes::tonemap", "tonemapping");
     build_shader("package::passes::lut", "lut");
+    build_shader("package::passes::luminance", "luminance");
+    build_shader("package::passes::reduce", "reduce");
+    build_shader("package::passes::exposure", "exposure");
 }

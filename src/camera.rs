@@ -6,6 +6,41 @@ pub use projection::Projection;
 
 use glam::{Mat4, Quat, Vec3, camera::rh::view};
 
+#[derive(Clone, Copy)]
+pub struct CameraExposureSettings {
+    pub aperture: f32,
+    pub shutter_speed_seconds: f32,
+    pub iso: f32,
+    pub exposure_compensation: f32,
+}
+
+impl Default for CameraExposureSettings {
+    fn default() -> Self {
+        Self {
+            aperture: 16.0,
+            shutter_speed_seconds: 1.0 / 100.0,
+            iso: 100.0,
+            exposure_compensation: 0.0,
+        }
+    }
+}
+
+impl CameraExposureSettings {
+    pub fn ev100(self) -> f32 {
+        let aperture = self.aperture.max(0.001);
+        let shutter_speed = self.shutter_speed_seconds.max(0.000001);
+        let iso = self.iso.max(0.001);
+
+        (aperture * aperture / shutter_speed).log2() - (iso / 100.0).log2()
+    }
+
+    pub fn exposure_stops(self) -> f32 {
+        let reference = Self::default().ev100();
+
+        reference - self.ev100() + self.exposure_compensation
+    }
+}
+
 pub struct Camera {
     pub position: Vec3,
     pub rotation: Quat,

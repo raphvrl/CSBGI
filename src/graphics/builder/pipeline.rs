@@ -155,13 +155,13 @@ impl<'device> RenderPipelineBuilder<'device> {
         let fragment = self.fragment_entry_point.as_deref().map(|entry_point| {
             let targets = targets
                 .as_ref()
-                .expect("a fragment shader requires a color format");
+                .map_or(&[][..], |targets| targets.as_slice());
 
             wgpu::FragmentState {
                 module: shader,
                 entry_point: Some(entry_point),
                 compilation_options: Default::default(),
-                targets: targets.as_slice(),
+                targets,
             }
         });
 

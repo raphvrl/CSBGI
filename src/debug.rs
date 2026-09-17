@@ -5,10 +5,12 @@ use egui::{ClippedPrimitive, Context, TexturesDelta, ViewportId};
 use egui_winit::State as EguiWinitState;
 use winit::{event::WindowEvent, window::Window};
 
+use crate::camera::CameraExposureSettings;
 use crate::graphics::{
     GraphicsContext,
     lighting::DirectionalLight,
     pass::egui::{EguiPass, EguiPassInput},
+    pass::exposure::ExposureSettings,
 };
 
 pub use data::DebugSnapshot;
@@ -69,6 +71,8 @@ impl DebugUi {
         window: &Window,
         snapshot: DebugSnapshot,
         light: &mut DirectionalLight,
+        exposure: &mut ExposureSettings,
+        camera_exposure: &mut CameraExposureSettings,
     ) {
         self.snapshot_timer += snapshot.delta_time;
 
@@ -83,7 +87,14 @@ impl DebugUi {
         let displayed_snapshot = self.displayed_snapshot;
 
         let output = context.run_ui(input, |ui| {
-            panels::show(ui, visible, &displayed_snapshot, light);
+            panels::show(
+                ui,
+                visible,
+                &displayed_snapshot,
+                light,
+                exposure,
+                camera_exposure,
+            );
         });
 
         self.winit

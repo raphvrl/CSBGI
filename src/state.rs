@@ -8,7 +8,7 @@ use winit::{
 use std::sync::Arc;
 
 use crate::assets::{AssetLoader, MaterialAssets, MeshAssets, TextureAssets, upload_scene};
-use crate::camera::{Camera, CameraController, Projection};
+use crate::camera::{Camera, CameraController, CameraExposureSettings, Projection};
 use crate::clock::Clock;
 use crate::debug::{DebugSnapshot, DebugUi};
 use crate::ecs::scene::spawn_scene;
@@ -21,13 +21,15 @@ use crate::graphics::{
     mipmap::MipmapGenerator,
     pass::{
         MeshDraw,
+        exposure::ExposurePass,
         geometry::{GeometryPass, GeometryPassInput},
+        luminance::{LuminancePass, LuminancePassInput},
         lut::{LutPass, LutPassInput},
         shadow::{ShadowPass, ShadowPassInput},
         sky::{SkyPass, SkyPassInput},
         tonemapping::{ToneMappingPass, ToneMappingPassInput},
     },
-    targets::{DepthTarget, SceneColorTarget, ShadowTarget},
+    targets::{DepthTarget, LuminanceTarget, SceneColorTarget, ShadowTarget},
 };
 
 const LUT_UPDATE_INTERVAL: f32 = 1.0 / 15.0;
@@ -36,7 +38,7 @@ struct LutKey {
     camera_height: f32,
     light_direction: glam::Vec3,
     light_color: glam::Vec3,
-    light_intensity: f32,
+    light_illuminance_lux: f32,
 }
 
 impl LutKey {
@@ -45,7 +47,7 @@ impl LutKey {
             camera_height,
             light_direction: light.direction,
             light_color: light.color,
-            light_intensity: light.intensity,
+            light_illuminance_lux: light.illuminance_lux,
         }
     }
 
@@ -57,7 +59,7 @@ impl LutKey {
         (self.camera_height - other.camera_height).abs() > HEIGHT_EPSILON
             || self.light_direction.distance_squared(other.light_direction) > DIRECTION_EPSILON
             || self.light_color.distance_squared(other.light_color) > VALUE_EPSILON
-            || (self.light_intensity - other.light_intensity).abs() > VALUE_EPSILON
+            || (self.light_illuminance_lux - other.light_illuminance_lux).abs() > VALUE_EPSILON
     }
 }
 
@@ -65,10 +67,12 @@ pub struct State {
     graphics: GraphicsContext,
 
     scene_color_target: SceneColorTarget,
+    luminance_target: LuminanceTarget,
     depth_target: DepthTarget,
     shadow_target: ShadowTarget,
 
     camera: Camera,
+    camera_exposure: CameraExposureSettings,
     camera_ctrl: CameraController,
     clock: Clock,
 
@@ -94,6 +98,8 @@ pub struct State {
     shadow_pass: ShadowPass,
     sky_pass: SkyPass,
     geometry_pass: GeometryPass,
+    luminance_pass: LuminancePass,
+    exposure_pass: ExposurePass,
     tonemapping_binding: ToneMappingBinding,
     tonemapping_pass: ToneMappingPass,
     debug: DebugUi,
@@ -109,6 +115,7 @@ impl State {
         let height = graphics.height();
 
         let scene_color_target = SceneColorTarget::new(&graphics, width, height);
+        let luminance_target = LuminanceTarget::new(&graphics, width, height);
         let depth_target = DepthTarget::new(&graphics, width, height);
         let shadow_target = ShadowTarget::new(&graphics);
 
@@ -122,6 +129,7 @@ impl State {
         let rotation = glam::Quat::IDENTITY;
 
         let camera = Camera::new(position, rotation, projection);
+        let camera_exposure = CameraExposureSettings::default();
         let camera_ctrl = CameraController::new(5.0, 0.003);
         let clock = Clock::new();
 
@@ -152,8 +160,12 @@ impl State {
 
         let object_gpu = ObjectGpu::new(&graphics);
 
-        let shadow_pass =
-            ShadowPass::new(&graphics, frame_gpu.shadow_layout(), object_gpu.layout());
+        let shadow_pass = ShadowPass::new(
+            &graphics,
+            frame_gpu.shadow_layout(),
+            object_gpu.layout(),
+            material_assets.layout(),
+        );
 
         let sky_pass = SkyPass::new(&graphics, frame_gpu.sky_layout());
 
@@ -164,8 +176,19 @@ impl State {
             material_assets.layout(),
         );
 
-        let tonemapping_binding =
-            ToneMappingBinding::new(&graphics, scene_color_target.resolve_view());
+        let luminance_pass = LuminancePass::new(
+            &graphics,
+            scene_color_target.resolve_view(),
+            &luminance_target,
+        );
+
+        let exposure_pass = ExposurePass::new(&graphics, luminance_target.final_view());
+
+        let tonemapping_binding = ToneMappingBinding::new(
+            &graphics,
+            scene_color_target.resolve_view(),
+            exposure_pass.buffer(),
+        );
 
         let tonemapping_pass = ToneMappingPass::new(&graphics, &tonemapping_binding);
 
@@ -182,10 +205,12 @@ impl State {
             graphics,
 
             scene_color_target,
+            luminance_target,
             depth_target,
             shadow_target,
 
             camera,
+            camera_exposure,
             camera_ctrl,
             clock,
 
@@ -211,6 +236,8 @@ impl State {
             sky_pass,
             tonemapping_binding,
             geometry_pass,
+            luminance_pass,
+            exposure_pass,
             tonemapping_pass,
             debug,
 
@@ -222,10 +249,19 @@ impl State {
         self.graphics.resize(width, height);
         self.scene_color_target
             .resize(&self.graphics, width, height);
+        self.luminance_target.resize(&self.graphics, width, height);
         self.tonemapping_binding.update_source(
             self.graphics.device(),
             self.scene_color_target.resolve_view(),
+            self.exposure_pass.buffer(),
         );
+        self.luminance_pass.update_bindings(
+            &self.graphics,
+            self.scene_color_target.resolve_view(),
+            &self.luminance_target,
+        );
+        self.exposure_pass
+            .update_luminance(&self.graphics, self.luminance_target.final_view());
         self.depth_target.resize(&self.graphics, width, height);
         self.frame_gpu
             .update_depth_target(&self.graphics, &self.depth_target, &self.lut);
@@ -269,6 +305,14 @@ impl State {
                 camera_position: self.camera.position,
             },
             &mut self.light,
+            self.exposure_pass.settings_mut(),
+            &mut self.camera_exposure,
+        );
+
+        self.exposure_pass.update(
+            self.graphics.queue(),
+            self.clock.delta_time(),
+            self.camera_exposure.exposure_stops(),
         );
 
         let key = LutKey::new(self.camera.position.y, &self.light);
@@ -326,8 +370,17 @@ impl State {
                 shadow_view: self.shadow_target.view(),
                 frame_bind_group: shadow_frame_bind_group,
                 object_bind_group,
+                material_assets: &self.material_assets,
                 mesh_draws: &self.mesh_draws,
                 mesh_assets: &self.mesh_assets,
+            },
+        );
+
+        self.sky_pass.record(
+            &mut encoder,
+            SkyPassInput {
+                color_view: self.scene_color_target.msaa_view(),
+                frame_bind_group: self.frame_gpu.sky_bind_group(),
             },
         );
 
@@ -357,13 +410,15 @@ impl State {
             self.lut.mark_updated();
         }
 
-        self.sky_pass.record(
+        self.luminance_pass.record(
             &mut encoder,
-            SkyPassInput {
-                color_view: resolve_view,
-                frame_bind_group: self.frame_gpu.sky_bind_group(),
+            LuminancePassInput {
+                scene_view: resolve_view,
+                target: &self.luminance_target,
             },
         );
+
+        self.exposure_pass.record(&mut encoder);
 
         self.tonemapping_pass.record(
             &mut encoder,

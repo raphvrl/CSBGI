@@ -1,4 +1,4 @@
-import package::common::frame::Frame;
+import package::common::frame::{Frame, lux_to_render};
 import package::sky::atmosphere::calculate;
 
 struct VertexOutput {
@@ -50,7 +50,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         frame.camera.camera_position,
         frame.light.light_direction,
         frame.light.light_color,
-        frame.light.light_intensity,
+        lux_to_render(frame.light.light_illuminance_lux),
     );
 
     return vec4<f32>(color, 1.0);

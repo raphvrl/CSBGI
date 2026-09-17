@@ -1,5 +1,6 @@
 const MAP_SIZE: f32 = 4096.0;
 const TEXEL_SIZE: f32 = 1.0 / MAP_SIZE;
+const RECEIVER_DEPTH_BIAS: f32 = 0.0002;
 
 fn sample(
     shadow_map: texture_depth_2d,
@@ -38,7 +39,7 @@ fn visibility(
         return 1.0;
     }
 
-    let depth = light_ndc.z;
+    let depth = max(light_ndc.z - RECEIVER_DEPTH_BIAS, 0.0);
     var result = 0.0;
 
     result += sample(shadow_map, shadow_sampler, shadow_uv, depth, vec2<f32>(-1.0, -1.0));

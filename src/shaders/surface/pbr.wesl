@@ -1,4 +1,4 @@
-import package::common::frame::{Camera, Light};
+import package::common::frame::{Camera, Light, lux_to_render};
 
 struct MaterialData {
     albedo: vec3<f32>,
@@ -72,29 +72,36 @@ fn calculate(
 
     let v = normalize(camera.camera_position - world_position);
     let l = normalize(-light.light_direction);
-    let h = normalize(v + l);
 
     let n_dot_v = max(dot(n, v), 0.0);
     let n_dot_l = max(dot(n, l), 0.0);
-    let n_dot_h = max(dot(n, h), 0.0);
-    let h_dot_v = max(dot(h, v), 0.0);
 
     let f0 = vec3<f32>(0.04) * (1.0 - metallic) + material.albedo * metallic;
-    let f = fresnel(h_dot_v, f0);
-    let d = distribution(n_dot_h, surface_roughness);
-    let g = smith(n_dot_v, n_dot_l, surface_roughness);
-    let specular = (d * g * f) / max(4.0 * n_dot_v * n_dot_l, 0.0001);
+    var direct_light = vec3<f32>(0.0);
 
-    let diffuse_weight = (vec3<f32>(1.0) - f) * (1.0 - metallic);
-    let diffuse = diffuse_weight * material.albedo / PI;
+    if n_dot_v > 0.0 && n_dot_l > 0.0 {
+        let h = normalize(v + l);
+        let n_dot_h = max(dot(n, h), 0.0);
+        let h_dot_v = max(dot(h, v), 0.0);
+        let f = fresnel(h_dot_v, f0);
+        let d = distribution(n_dot_h, surface_roughness);
+        let g = smith(n_dot_v, n_dot_l, surface_roughness);
+        let specular = (d * g * f) / max(4.0 * n_dot_v * n_dot_l, 0.0001);
+        let diffuse = (vec3<f32>(1.0) - f) * (1.0 - metallic)
+            * material.albedo / PI;
 
-    let direct_light = (diffuse + specular)
+        direct_light = (diffuse + specular)
+            * light.light_color
+            * lux_to_render(light.light_illuminance_lux)
+            * n_dot_l
+            * shadow;
+    }
+
+    let ambient_diffuse = material.albedo * (1.0 - metallic) / PI;
+    let ambient_light = ambient_diffuse
         * light.light_color
-        * light.light_intensity
-        * n_dot_l
-        * shadow;
-
-    let ambient_light = diffuse * light.light_color * light.ambient * occlusion;
+        * lux_to_render(light.ambient_illuminance_lux)
+        * occlusion;
 
     return direct_light + ambient_light;
 }

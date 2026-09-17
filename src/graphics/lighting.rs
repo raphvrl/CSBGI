@@ -3,6 +3,8 @@ use glam::{
     camera::rh::{proj::directx, view},
 };
 
+pub const REFERENCE_ILLUMINANCE_LUX: f32 = 100_000.0;
+
 pub struct ShadowSettings {
     pub center: Vec3,
     pub half_extent: f32,
@@ -26,15 +28,20 @@ impl Default for ShadowSettings {
 pub struct DirectionalLight {
     pub direction: Vec3,
     pub color: Vec3,
-    pub intensity: f32,
-    pub ambient: f32,
+    pub illuminance_lux: f32,
+    pub ambient_illuminance_lux: f32,
 
     sun_rise: f32,
     sun_yaw: f32,
 }
 
 impl DirectionalLight {
-    pub fn new(direction: Vec3, color: Vec3, intensity: f32, ambient: f32) -> Self {
+    pub fn new(
+        direction: Vec3,
+        color: Vec3,
+        illuminance_lux: f32,
+        ambient_illuminance_lux: f32,
+    ) -> Self {
         let sun_direction = -direction.normalize_or_zero();
         let horizontal = Vec3::new(sun_direction.x, 0.0, sun_direction.z).length();
         let rise = horizontal
@@ -44,8 +51,8 @@ impl DirectionalLight {
         Self {
             direction,
             color,
-            intensity,
-            ambient,
+            illuminance_lux,
+            ambient_illuminance_lux,
             sun_rise: rise,
             sun_yaw: sun_direction.z.atan2(sun_direction.x),
         }
@@ -100,6 +107,11 @@ impl DirectionalLight {
 
 impl Default for DirectionalLight {
     fn default() -> Self {
-        Self::new(Vec3::new(-1.0, -1.0, -1.0).normalize(), Vec3::ONE, 5.0, 0.1)
+        Self::new(
+            Vec3::new(-1.0, -1.0, -1.0).normalize(),
+            Vec3::ONE,
+            REFERENCE_ILLUMINANCE_LUX,
+            10_000.0,
+        )
     }
 }

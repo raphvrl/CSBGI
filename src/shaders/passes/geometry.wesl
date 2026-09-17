@@ -33,6 +33,8 @@ var orm_texture: texture_2d<f32>;
 @group(2) @binding(4)
 var material_sampler: sampler;
 
+const ALPHA_CUTOFF: f32 = 0.1;
+
 @vertex
 fn vs_main(in: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
     let model = objects[instance].model;
@@ -57,6 +59,10 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         material_sampler,
         input.uv,
     ) * material.base_color_factor;
+
+    if base_color.a < ALPHA_CUTOFF {
+        discard;
+    }
 
     let orm = textureSample(
         orm_texture,
