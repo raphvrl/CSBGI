@@ -21,8 +21,8 @@ impl Default for ExposureSettings {
     fn default() -> Self {
         Self {
             target_luminance: 0.4,
-            min_exposure: -8.0,
-            max_exposure: 10.0,
+            min_exposure: -4.0,
+            max_exposure: 6.0,
             adaptation_speed: 0.5,
         }
     }

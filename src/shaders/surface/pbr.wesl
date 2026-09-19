@@ -68,7 +68,7 @@ fn calculate(
     let base_roughness = clamp(material.orm.g * material.factors.y, 0.04, 1.0);
     let n = normalize(normal);
     let surface_roughness = roughness(n, base_roughness);
-    let metallic = clamp(material.orm.b * material.factors.x, 0.0, 1.0);
+    let metallic = 0.0;
 
     let v = normalize(camera.camera_position - world_position);
     let l = normalize(-light.light_direction);
