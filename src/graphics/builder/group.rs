@@ -10,7 +10,7 @@ impl BindGroupExt for wgpu::Device {
 
 struct PendingEntry<'resource> {
     binding: u32,
-    resource: Option<wgpu::BindingResource<'resource>>,
+    resource: wgpu::BindingResource<'resource>,
 }
 
 pub struct BindGroupBuilder<'device> {
@@ -19,7 +19,6 @@ pub struct BindGroupBuilder<'device> {
     label: Option<String>,
     layout: Option<&'device wgpu::BindGroupLayout>,
     entries: Vec<PendingEntry<'device>>,
-    active_entry: Option<usize>,
 }
 
 impl<'device> BindGroupBuilder<'device> {
@@ -30,7 +29,6 @@ impl<'device> BindGroupBuilder<'device> {
             label: None,
             layout: None,
             entries: Vec::new(),
-            active_entry: None,
         }
     }
 
@@ -44,46 +42,21 @@ impl<'device> BindGroupBuilder<'device> {
         self
     }
 
-    pub fn entry(mut self, binding: u32) -> Self {
-        if self.entries.iter().any(|entry| entry.binding == binding) {
-            panic!("BindGroupBuilder: duplicate binding {binding}");
-        }
-
-        let index = self.entries.len();
-
-        self.entries.push(PendingEntry {
-            binding,
-            resource: None,
-        });
-
-        self.active_entry = Some(index);
+    pub fn resource(mut self, binding: u32, resource: wgpu::BindingResource<'device>) -> Self {
+        self.insert(binding, resource);
         self
     }
 
-    pub fn resource(mut self, resource: wgpu::BindingResource<'device>) -> Self {
-        let entry = self.active_entry_mut();
-
-        if entry.resource.is_some() {
-            panic!(
-                "BindGroupBuilder: binding {} already has a resource",
-                entry.binding
-            );
-        }
-
-        entry.resource = Some(resource);
-        self
+    pub fn buffer(self, binding: u32, buffer: &'device wgpu::Buffer) -> Self {
+        self.resource(binding, buffer.as_entire_binding())
     }
 
-    pub fn buffer(self, buffer: &'device wgpu::Buffer) -> Self {
-        self.resource(buffer.as_entire_binding())
+    pub fn texture(self, binding: u32, view: &'device wgpu::TextureView) -> Self {
+        self.resource(binding, wgpu::BindingResource::TextureView(view))
     }
 
-    pub fn texture(self, view: &'device wgpu::TextureView) -> Self {
-        self.resource(wgpu::BindingResource::TextureView(view))
-    }
-
-    pub fn sampler(self, sampler: &'device wgpu::Sampler) -> Self {
-        self.resource(wgpu::BindingResource::Sampler(sampler))
+    pub fn sampler(self, binding: u32, sampler: &'device wgpu::Sampler) -> Self {
+        self.resource(binding, wgpu::BindingResource::Sampler(sampler))
     }
 
     pub fn build(self) -> wgpu::BindGroup {
@@ -92,25 +65,15 @@ impl<'device> BindGroupBuilder<'device> {
             label,
             layout,
             entries,
-            active_entry: _,
         } = self;
 
         let layout = layout.expect("BindGroupBuilder: layout is required");
 
         let entries = entries
             .into_iter()
-            .map(|entry| {
-                let resource = entry.resource.unwrap_or_else(|| {
-                    panic!(
-                        "BindGroupBuilder: binding {} has no resource",
-                        entry.binding
-                    )
-                });
-
-                wgpu::BindGroupEntry {
-                    binding: entry.binding,
-                    resource,
-                }
+            .map(|entry| wgpu::BindGroupEntry {
+                binding: entry.binding,
+                resource: entry.resource,
             })
             .collect::<Vec<_>>();
 
@@ -121,13 +84,11 @@ impl<'device> BindGroupBuilder<'device> {
         })
     }
 
-    fn active_entry_mut(&mut self) -> &mut PendingEntry<'device> {
-        let index = self
-            .active_entry
-            .expect("BindGroupBuilder: no active entry");
+    fn insert(&mut self, binding: u32, resource: wgpu::BindingResource<'device>) {
+        if self.entries.iter().any(|entry| entry.binding == binding) {
+            panic!("BindGroupBuilder: duplicate binding {binding}");
+        }
 
-        self.entries
-            .get_mut(index)
-            .expect("BindGroupBuilder: invalid active entry")
+        self.entries.push(PendingEntry { binding, resource });
     }
 }

@@ -85,16 +85,11 @@ impl MaterialGpu {
             .bind_group_builder()
             .label("Material Bind Group")
             .layout(layout.layout())
-            .entry(0)
-            .buffer(&buffer)
-            .entry(1)
-            .texture(color_texture.view())
-            .entry(2)
-            .texture(normal_texture.view())
-            .entry(3)
-            .texture(orm_texture.view())
-            .entry(4)
-            .sampler(color_texture.sampler())
+            .buffer(0, &buffer)
+            .texture(1, color_texture.view())
+            .texture(2, normal_texture.view())
+            .texture(3, orm_texture.view())
+            .sampler(4, color_texture.sampler())
             .build();
 
         Self {

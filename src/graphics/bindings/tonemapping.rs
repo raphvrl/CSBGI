@@ -87,12 +87,9 @@ impl ToneMappingBinding {
             .bind_group_builder()
             .label("Tone Mapping Bind Group")
             .layout(layout)
-            .entry(0)
-            .texture(source_view)
-            .entry(1)
-            .sampler(sampler)
-            .entry(2)
-            .buffer(exposure_buffer)
+            .texture(0, source_view)
+            .sampler(1, sampler)
+            .buffer(2, exposure_buffer)
             .build()
     }
 }

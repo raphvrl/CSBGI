@@ -4,7 +4,7 @@ use wgpu::util::DeviceExt;
 
 use crate::graphics::{
     GraphicsContext,
-    builder::{BindGroupExt, BindGroupLayoutExt},
+    builder::{BindGroupExt, BindGroupLayoutExt, ComputePassExt, ComputePipelineExt},
 };
 
 const INITIAL_EXPOSURE: f32 = 0.0;
@@ -43,7 +43,7 @@ struct ExposureParams {
     adaptation_speed: f32,
     delta_time: f32,
     camera_exposure_stops: f32,
-    _padding: [f32; 2],
+    _pad0: [f32; 2],
 }
 
 pub struct ExposurePass {
@@ -64,11 +64,8 @@ impl ExposurePass {
             .bind_group_layout_builder()
             .label("Exposure Bind Group Layout")
             .entry(0)
-                .texture_with(
-                    wgpu::TextureSampleType::Float { filterable: false },
-                    wgpu::TextureViewDimension::D2,
-                    false,
-                )
+                .texture()
+                .unfilterable()
                 .compute()
             .entry(1)
                 .storage()
@@ -83,20 +80,12 @@ impl ExposurePass {
             source: wgpu::ShaderSource::Wgsl(include_wesl!("exposure").into()),
         });
 
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Exposure Pipeline Layout"),
-            bind_group_layouts: &[Some(&bind_group_layout)],
-            immediate_size: 0,
-        });
-
-        let pipeline = device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("Exposure Pipeline"),
-            layout: Some(&pipeline_layout),
-            module: &shader,
-            entry_point: Some("cs_main"),
-            compilation_options: Default::default(),
-            cache: None,
-        });
+        let pipeline = device
+            .compute_pipeline_builder()
+            .label("Exposure Pipeline")
+            .shader(&shader)
+            .bind_group_layout(&bind_group_layout)
+            .build();
 
         let state_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Exposure State Buffer"),
@@ -152,17 +141,17 @@ impl ExposurePass {
             adaptation_speed: self.settings.adaptation_speed,
             delta_time,
             camera_exposure_stops,
-            _padding: [0.0; 2],
+            _pad0: [0.0; 2],
         };
 
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
     }
 
     pub fn record(&self, encoder: &mut wgpu::CommandEncoder) {
-        let mut compute_pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-            label: Some("Exposure Compute Pass"),
-            timestamp_writes: None,
-        });
+        let mut compute_pass = encoder
+            .compute_pass_builder()
+            .label("Exposure Compute Pass")
+            .build();
 
         compute_pass.set_pipeline(&self.pipeline);
         compute_pass.set_bind_group(0, &self.bind_group, &[]);
@@ -188,12 +177,9 @@ impl ExposurePass {
             .bind_group_builder()
             .label("Exposure Bind Group")
             .layout(layout)
-            .entry(0)
-            .texture(luminance_view)
-            .entry(1)
-            .buffer(state_buffer)
-            .entry(2)
-            .buffer(params_buffer)
+            .texture(0, luminance_view)
+            .buffer(1, state_buffer)
+            .buffer(2, params_buffer)
             .build()
     }
 }

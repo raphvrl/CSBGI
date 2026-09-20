@@ -5,5 +5,7 @@ pub mod pipeline;
 
 pub use group::{BindGroupBuilder, BindGroupExt};
 pub use layout::{BindGroupLayoutBuilder, BindGroupLayoutExt};
-pub use pass::{ClearValue, RenderPassBuilder, RenderPassExt};
-pub use pipeline::{RenderPipelineBuilder, RenderPipelineExt};
+pub use pass::{ClearValue, ComputePassBuilder, ComputePassExt, RenderPassBuilder, RenderPassExt};
+pub use pipeline::{
+    ComputePipelineBuilder, ComputePipelineExt, RenderPipelineBuilder, RenderPipelineExt,
+};

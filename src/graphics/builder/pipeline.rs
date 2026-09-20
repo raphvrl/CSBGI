@@ -1,3 +1,98 @@
+pub trait ComputePipelineExt {
+    fn compute_pipeline_builder(&self) -> ComputePipelineBuilder<'_>;
+}
+
+impl ComputePipelineExt for wgpu::Device {
+    fn compute_pipeline_builder(&self) -> ComputePipelineBuilder<'_> {
+        ComputePipelineBuilder::new(self)
+    }
+}
+
+pub struct ComputePipelineBuilder<'device> {
+    device: &'device wgpu::Device,
+
+    label: Option<String>,
+    shader: Option<&'device wgpu::ShaderModule>,
+    layout: Option<&'device wgpu::PipelineLayout>,
+    bind_group_layouts: Vec<Option<&'device wgpu::BindGroupLayout>>,
+    entry_point: String,
+}
+
+impl<'device> ComputePipelineBuilder<'device> {
+    pub fn new(device: &'device wgpu::Device) -> Self {
+        Self {
+            device,
+
+            label: None,
+            shader: None,
+            layout: None,
+            bind_group_layouts: Vec::new(),
+            entry_point: "cs_main".to_string(),
+        }
+    }
+
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    pub fn shader(mut self, shader: &'device wgpu::ShaderModule) -> Self {
+        self.shader = Some(shader);
+        self
+    }
+
+    pub fn layout(mut self, layout: &'device wgpu::PipelineLayout) -> Self {
+        self.layout = Some(layout);
+        self
+    }
+
+    pub fn bind_group_layout(mut self, layout: &'device wgpu::BindGroupLayout) -> Self {
+        self.bind_group_layouts.push(Some(layout));
+        self
+    }
+
+    pub fn entry_point(mut self, entry_point: impl Into<String>) -> Self {
+        self.entry_point = entry_point.into();
+        self
+    }
+
+    pub fn build(self) -> wgpu::ComputePipeline {
+        let Self {
+            device,
+            label,
+            shader,
+            layout,
+            bind_group_layouts,
+            entry_point,
+        } = self;
+
+        let shader = shader.expect("ComputePipelineBuilder: shader is required");
+
+        let generated_layout = if layout.is_none() {
+            Some(
+                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    label: label.as_deref(),
+                    bind_group_layouts: &bind_group_layouts,
+                    immediate_size: 0,
+                }),
+            )
+        } else {
+            None
+        };
+
+        let layout = layout.or(generated_layout.as_ref());
+
+        device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+            label: label.as_deref(),
+            layout,
+            module: shader,
+            entry_point: Some(&entry_point),
+            compilation_options: Default::default(),
+            cache: None,
+        })
+    }
+}
+
 pub trait RenderPipelineExt {
     fn render_pipeline_builder(&self) -> RenderPipelineBuilder<'_>;
 }

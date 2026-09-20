@@ -175,6 +175,51 @@ impl<'device> BindGroupLayoutBuilder<'device> {
         self
     }
 
+    pub fn unfilterable(mut self) -> Self {
+        let entry = self.active_entry_mut();
+
+        match entry.ty.as_mut() {
+            Some(wgpu::BindingType::Texture {
+                sample_type: wgpu::TextureSampleType::Float { filterable },
+                ..
+            }) => *filterable = false,
+            _ => {
+                panic!("BindGroupLayoutBuilder: unfilterable requires a float texture binding");
+            }
+        }
+
+        self
+    }
+
+    pub fn view_dimension(mut self, view_dimension: wgpu::TextureViewDimension) -> Self {
+        let entry = self.active_entry_mut();
+
+        match entry.ty.as_mut() {
+            Some(wgpu::BindingType::Texture {
+                view_dimension: current_dimension,
+                ..
+            }) => *current_dimension = view_dimension,
+            _ => {
+                panic!("BindGroupLayoutBuilder: view_dimension requires a texture binding");
+            }
+        }
+
+        self
+    }
+
+    pub fn multisampled(mut self) -> Self {
+        let entry = self.active_entry_mut();
+
+        match entry.ty.as_mut() {
+            Some(wgpu::BindingType::Texture { multisampled, .. }) => *multisampled = true,
+            _ => {
+                panic!("BindGroupLayoutBuilder: multisampled requires a texture binding");
+            }
+        }
+
+        self
+    }
+
     pub fn texture_with(
         mut self,
         sample_type: wgpu::TextureSampleType,

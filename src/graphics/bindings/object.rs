@@ -100,7 +100,6 @@ fn create_bind_group(
         .bind_group_builder()
         .label("Object Bind Group")
         .layout(layout)
-        .entry(0)
-        .buffer(buffer)
+        .buffer(0, buffer)
         .build()
 }

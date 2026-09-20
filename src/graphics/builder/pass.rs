@@ -1,3 +1,57 @@
+pub trait ComputePassExt {
+    fn compute_pass_builder(&mut self) -> ComputePassBuilder<'_>;
+}
+
+impl ComputePassExt for wgpu::CommandEncoder {
+    fn compute_pass_builder(&mut self) -> ComputePassBuilder<'_> {
+        ComputePassBuilder::new(self)
+    }
+}
+
+pub struct ComputePassBuilder<'encoder> {
+    encoder: &'encoder mut wgpu::CommandEncoder,
+
+    label: Option<String>,
+    timestamp_writes: Option<wgpu::ComputePassTimestampWrites<'encoder>>,
+}
+
+impl<'encoder> ComputePassBuilder<'encoder> {
+    pub fn new(encoder: &'encoder mut wgpu::CommandEncoder) -> Self {
+        Self {
+            encoder,
+
+            label: None,
+            timestamp_writes: None,
+        }
+    }
+
+    pub fn label(mut self, label: impl Into<String>) -> Self {
+        self.label = Some(label.into());
+        self
+    }
+
+    pub fn timestamp_writes(
+        mut self,
+        timestamp_writes: wgpu::ComputePassTimestampWrites<'encoder>,
+    ) -> Self {
+        self.timestamp_writes = Some(timestamp_writes);
+        self
+    }
+
+    pub fn build(self) -> wgpu::ComputePass<'encoder> {
+        let Self {
+            encoder,
+            label,
+            timestamp_writes,
+        } = self;
+
+        encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
+            label: label.as_deref(),
+            timestamp_writes,
+        })
+    }
+}
+
 pub trait RenderPassExt {
     fn render_pass_builder(&mut self) -> RenderPassBuilder<'_>;
 }

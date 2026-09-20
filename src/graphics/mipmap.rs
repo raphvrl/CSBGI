@@ -149,10 +149,8 @@ impl MipmapGenerator {
                 .bind_group_builder()
                 .label("Mipmap Bind Group")
                 .layout(&self.bind_group_layout)
-                .entry(0)
-                    .texture(&source_view)
-                .entry(1)
-                    .sampler(&self.sampler)
+                .texture(0, &source_view)
+                .sampler(1, &self.sampler)
                 .build();
 
             let mut rpass = encoder

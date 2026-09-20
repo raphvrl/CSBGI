@@ -157,10 +157,8 @@ impl LuminancePass {
             .bind_group_builder()
             .label(label)
             .layout(layout)
-            .entry(0)
-            .texture(source_view)
-            .entry(1)
-            .sampler(sampler)
+            .texture(0, source_view)
+            .sampler(1, sampler)
             .build()
     }
 

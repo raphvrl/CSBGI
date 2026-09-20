@@ -90,11 +90,9 @@ impl FrameGpu {
                 .vertex()
                 .fragment()
             .entry(3)
-                .texture_with(
-                    wgpu::TextureSampleType::Depth,
-                    wgpu::TextureViewDimension::D2,
-                    true,
-                )
+                .texture()
+                .depth()
+                .multisampled()
                 .fragment()
             .entry(4)
                 .texture()
@@ -134,12 +132,9 @@ impl FrameGpu {
             .bind_group_builder()
             .label("Frame Bind Group")
             .layout(&layout)
-            .entry(0)
-                .buffer(&buffer)
-            .entry(1)
-                .texture(shadow_target.view())
-            .entry(2)
-                .sampler(shadow_target.sampler())
+            .buffer(0, &buffer)
+            .texture(1, shadow_target.view())
+            .sampler(2, shadow_target.sampler())
             .build();
 
         #[rustfmt::skip]
@@ -147,8 +142,7 @@ impl FrameGpu {
             .bind_group_builder()
             .label("LUT Bind Group")
             .layout(&lut_layout)
-            .entry(0)
-                .buffer(&buffer)
+            .buffer(0, &buffer)
             .build();
 
         #[rustfmt::skip]
@@ -156,14 +150,10 @@ impl FrameGpu {
             .bind_group_builder()
             .label("Sky Bind Group")
             .layout(&sky_layout)
-            .entry(0)
-                .buffer(&buffer)
-            .entry(3)
-                .texture(depth_target.view())
-            .entry(4)
-                .texture(lut.view())
-            .entry(5)
-                .sampler(lut.sampler())
+            .buffer(0, &buffer)
+            .texture(3, depth_target.view())
+            .texture(4, lut.view())
+            .sampler(5, lut.sampler())
             .build();
 
         #[rustfmt::skip]
@@ -171,8 +161,7 @@ impl FrameGpu {
             .bind_group_builder()
             .label("Shadow Frame Bind Group")
             .layout(&shadow_layout)
-            .entry(0)
-                .buffer(&buffer)
+            .buffer(0, &buffer)
             .build();
 
         Self {
@@ -199,14 +188,10 @@ impl FrameGpu {
             .bind_group_builder()
             .label("Sky Bind Group")
             .layout(&self.sky_layout)
-            .entry(0)
-            .buffer(&self.buffer)
-            .entry(3)
-            .texture(depth_target.view())
-            .entry(4)
-            .texture(lut.view())
-            .entry(5)
-            .sampler(lut.sampler())
+            .buffer(0, &self.buffer)
+            .texture(3, depth_target.view())
+            .texture(4, lut.view())
+            .sampler(5, lut.sampler())
             .build();
     }
 
