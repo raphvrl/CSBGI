@@ -1,5 +1,8 @@
 mod data;
+mod history;
 mod panels;
+
+use std::time::Instant;
 
 use egui::{ClippedPrimitive, Context, TexturesDelta, ViewportId};
 use egui_winit::State as EguiWinitState;
@@ -14,7 +17,8 @@ use crate::graphics::{
     pass::exposure::ExposureSettings,
 };
 
-pub use data::{DebugSnapshot, VoxelDebugMode};
+pub use data::{DebugSnapshot, ProfileStage, VoxelDebugMode};
+use history::ProfilerHistory;
 
 pub struct DebugInput<'a> {
     pub light: &'a mut DirectionalLight,
@@ -42,6 +46,8 @@ pub struct DebugUi {
 
     displayed_snapshot: DebugSnapshot,
     snapshot_timer: f32,
+    profiler_history: ProfilerHistory,
+    profiler_visible: bool,
 }
 
 impl DebugUi {
@@ -66,7 +72,26 @@ impl DebugUi {
             visible: true,
             displayed_snapshot: DebugSnapshot::default(),
             snapshot_timer: 0.0,
+            profiler_history: ProfilerHistory::default(),
+            profiler_visible: false,
         }
+    }
+
+    pub fn begin_profile_frame(&mut self, frame_time: f32) {
+        self.profiler_history.begin_frame(frame_time);
+    }
+
+    pub fn record_cpu_time(&mut self, stage: ProfileStage, started: Instant) {
+        self.profiler_history
+            .record_cpu(stage, started.elapsed().as_secs_f32() * 1000.0);
+    }
+
+    pub fn record_gpu_times(&mut self, values_ms: [f32; ProfileStage::COUNT]) {
+        self.profiler_history.set_gpu_sample(values_ms);
+    }
+
+    pub fn gpu_timestamps_unavailable(&mut self) {
+        self.profiler_history.set_gpu_unavailable();
     }
 
     pub fn on_window_event(&mut self, window: &Window, event: &WindowEvent) -> bool {
@@ -94,14 +119,31 @@ impl DebugUi {
         let visible = self.visible;
         let displayed_snapshot = self.displayed_snapshot;
 
+        let ui_started = Instant::now();
+        let profiler = &self.profiler_history;
+        let profiler_visible = &mut self.profiler_visible;
         let output = context.run_ui(egui_input, |ui| {
-            panels::show(ui, visible, &displayed_snapshot, &mut input);
+            panels::show(
+                ui,
+                visible,
+                &displayed_snapshot,
+                &mut input,
+                profiler,
+                profiler_visible,
+            );
         });
+        self.profiler_history.record_cpu(
+            ProfileStage::DebugUi,
+            ui_started.elapsed().as_secs_f32() * 1000.0,
+        );
 
-        self.winit.handle_platform_output(window, output.platform_output);
+        self.winit
+            .handle_platform_output(window, output.platform_output);
 
         self.pixels_per_point = output.pixels_per_point;
-        self.paint_jobs = self.context.tessellate(output.shapes, output.pixels_per_point);
+        self.paint_jobs = self
+            .context
+            .tessellate(output.shapes, output.pixels_per_point);
         self.textures_delta.clear();
         self.textures_delta = output.textures_delta;
     }

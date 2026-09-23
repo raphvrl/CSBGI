@@ -26,12 +26,13 @@ struct GpuVoxelGrid {
 
 struct GpuVoxelTraceSettings {
     cone_count: u32,
-    max_steps: u32,
-    padding0: vec2<u32>,
+    padding0: u32,
+    padding1: u32,
+    padding2: u32,
     max_distance: f32,
     cone_angle: f32,
     intensity: f32,
-    padding1: f32,
+    padding3: f32,
 };
 
 struct VoxelSample {

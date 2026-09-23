@@ -5,47 +5,44 @@ import package::common::voxel::geometry_sampler::{
     trace_settings,
     voxel_lod_for_diameter,
 };
-import package::common::voxel::constants::MIP_LEVELS;
+
+const TAU: f32 = 6.28318530718;
 
 const VCT_MAX_CONES: u32 = 6u;
-const VCT_MAX_STEPS: u32 = 8u;
+const VCT_STEP_FACTOR: f32 = 0.5;
+const VCT_START_DISTANCE_VOXELS: f32 = 2.0;
+const VCT_MIN_DIAMETER_VOXELS: f32 = 4.0;
+const VCT_MIN_TRANSMITTANCE: f32 = 0.02;
+const VCT_NORMAL_OFFSET_VOXELS: f32 = 1.5;
+const VCT_RING_TILT: f32 = TAU / 8.0;
+const VCT_CENTER_WEIGHT: f32 = 0.5;
+const VCT_POLE_THRESHOLD: f32 = 0.99;
 
 fn trace_cone(
     origin: vec3<f32>,
     direction: vec3<f32>,
 ) -> vec3<f32> {
     let voxel_size = grid.origin_and_voxel_size.w;
-    var distance = voxel_size * 2.0;
+    let base_cell_size = mip_info.levels[0u].cell_size_and_padding.x;
+    let diameter_per_distance = 2.0 * tan(trace_settings.cone_angle * 0.5);
+    let min_diameter = voxel_size * VCT_MIN_DIAMETER_VOXELS;
+    var distance = voxel_size * VCT_START_DISTANCE_VOXELS;
     var transmittance = 1.0;
     var result = vec3<f32>(0.0);
 
-    for (var step = 0u; step < VCT_MAX_STEPS; step++) {
-        if distance >= trace_settings.max_distance
-            || step >= trace_settings.max_steps
-            || transmittance < 0.02 {
-            break;
-        }
-
-        let diameter = max(
-            distance * 2.0 * tan(trace_settings.cone_angle * 0.5),
-            voxel_size * 4.0,
-        );
+    while distance < trace_settings.max_distance && transmittance >= VCT_MIN_TRANSMITTANCE {
+        let diameter = max(distance * diameter_per_distance, min_diameter);
         let lod = voxel_lod_for_diameter(diameter);
         let sample = sample_voxel_lod(origin + direction * distance, lod);
+        let step_length = diameter * VCT_STEP_FACTOR;
 
-        result += transmittance * sample.radiance * sample.opacity;
-        transmittance *= 1.0 - sample.opacity;
+        let cell_size = base_cell_size * exp2(lod);
+        let opacity = 1.0 - pow(1.0 - sample.opacity, step_length / cell_size);
 
-        let lower_level = u32(floor(lod));
-        let upper_level = min(lower_level + 1u, MIP_LEVELS - 1u);
+        result += transmittance * sample.radiance * opacity;
+        transmittance *= 1.0 - opacity;
 
-        let mip_step = mix(
-            mip_info.levels[lower_level].cell_size_and_padding.x,
-            mip_info.levels[upper_level].cell_size_and_padding.x,
-            fract(lod),
-        );
-
-        distance += max(mip_step, voxel_size);
+        distance += step_length;
     }
 
     return result;
@@ -59,43 +56,34 @@ fn trace_diffuse(
     let reference = select(
         vec3<f32>(0.0, 1.0, 0.0),
         vec3<f32>(1.0, 0.0, 0.0),
-        abs(normal.y) > 0.99,
+        abs(normal.y) > VCT_POLE_THRESHOLD,
     );
 
     let tangent = normalize(cross(reference, normal));
     let bitangent = normalize(cross(normal, tangent));
-    let origin = world_position + normal * grid.origin_and_voxel_size.w * 1.5;
-    let side = 0.70710678;
+    let voxel_size = grid.origin_and_voxel_size.w;
+    let origin = world_position + normal * voxel_size * VCT_NORMAL_OFFSET_VOXELS;
 
     let center = trace_cone(origin, normal);
-
-    let ring_directions = array<vec2<f32>, 5>(
-        vec2<f32>(1.0, 0.0),
-        vec2<f32>(0.30901699, 0.95105654),
-        vec2<f32>(-0.80901699, 0.58778524),
-        vec2<f32>(-0.80901699, -0.58778524),
-        vec2<f32>(0.30901699, -0.95105654),
-    );
 
     let ring_count = clamp(
         max(trace_settings.cone_count, 1u) - 1u,
         1u,
         VCT_MAX_CONES - 1u,
     );
+    let angle_step = TAU / f32(ring_count);
+    let ring_axis = normal * cos(VCT_RING_TILT);
+    let ring_radius = sin(VCT_RING_TILT);
+    let ring_weight = (1.0 - VCT_CENTER_WEIGHT) / f32(ring_count);
 
-    var indirect = center * 0.5;
+    var indirect = center * VCT_CENTER_WEIGHT;
 
-    for (var ring_index = 0u; ring_index < VCT_MAX_CONES - 1u; ring_index++) {
-        if ring_index >= ring_count {
-            break;
-        }
+    for (var ring_index = 0u; ring_index < ring_count; ring_index++) {
+        let angle = f32(ring_index) * angle_step;
+        let direction = ring_axis
+            + (tangent * cos(angle) + bitangent * sin(angle)) * ring_radius;
 
-        let ring_direction = ring_directions[ring_index];
-        let direction = normalize(
-            normal * side + (tangent * ring_direction.x + bitangent * ring_direction.y) * side,
-        );
-
-        indirect += trace_cone(origin, direction) * (0.5 / f32(ring_count));
+        indirect += trace_cone(origin, direction) * ring_weight;
     }
 
     return indirect * trace_settings.intensity;

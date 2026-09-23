@@ -10,7 +10,7 @@ use winit::{
 use crate::{
     camera::CameraRig,
     clock::Clock,
-    debug::{DebugInput, DebugSnapshot, DebugUi},
+    debug::{DebugInput, DebugSnapshot, DebugUi, ProfileStage},
     graphics::{
         GraphicsContext,
         renderer::{RenderFrame, Renderer, RendererResources},
@@ -34,7 +34,10 @@ impl State {
     pub async fn new(window: Arc<Window>) -> Result<Self> {
         let startup = Instant::now();
         let graphics = GraphicsContext::new(&window).await?;
-        tracing::info!(stage = "graphics", elapsed_ms = startup.elapsed().as_millis());
+        tracing::info!(
+            stage = "graphics",
+            elapsed_ms = startup.elapsed().as_millis()
+        );
 
         let width = graphics.width();
         let height = graphics.height();
@@ -74,14 +77,25 @@ impl State {
     pub fn update(&mut self) {
         self.clock.tick();
         let dt = self.clock.delta_time();
+        self.debug.begin_profile_frame(self.clock.frame_time());
 
+        let started = Instant::now();
         self.camera.update(dt);
+        self.debug
+            .record_cpu_time(ProfileStage::CameraUpdate, started);
+
+        let started = Instant::now();
         self.renderer.update(dt);
+        self.debug
+            .record_cpu_time(ProfileStage::RendererUpdate, started);
     }
 
     pub fn prepare(&mut self) {
         let previous_light = self.scene.light_signature();
+        let started = Instant::now();
         self.scene.prepare_draws();
+        self.debug
+            .record_cpu_time(ProfileStage::ScenePreparation, started);
 
         let (exposure, auto_exposure_enabled, manual_exposure) = self.renderer.debug_settings_mut();
         let (
@@ -96,7 +110,7 @@ impl State {
         self.debug.prepare(
             self.window.as_ref(),
             DebugSnapshot {
-                delta_time: self.clock.delta_time(),
+                delta_time: self.clock.frame_time(),
                 mesh_count: self.scene.mesh_count(),
                 draw_count: self.scene.mesh_count(),
                 camera_position: self.camera.camera().position,
@@ -119,8 +133,15 @@ impl State {
         self.voxel.upload_trace_settings(self.graphics.queue());
         self.voxel
             .mark_radiance_dirty(previous_light != self.scene.light_signature());
-        self.renderer
-            .prepare(&self.graphics, &self.scene, &self.camera, self.clock.delta_time());
+        let started = Instant::now();
+        self.renderer.prepare(
+            &self.graphics,
+            &self.scene,
+            &self.camera,
+            self.clock.delta_time(),
+        );
+        self.debug
+            .record_cpu_time(ProfileStage::RendererPreparation, started);
     }
 
     pub fn render(&mut self) -> Result<()> {

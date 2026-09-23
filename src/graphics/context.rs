@@ -6,6 +6,7 @@ pub struct GraphicsContext {
     device: wgpu::Device,
     queue: wgpu::Queue,
     config: wgpu::SurfaceConfiguration,
+    timestamp_queries_supported: bool,
 }
 
 impl GraphicsContext {
@@ -31,10 +32,19 @@ impl GraphicsContext {
             })
             .await?;
 
+        let timestamp_features =
+            wgpu::Features::TIMESTAMP_QUERY | wgpu::Features::TIMESTAMP_QUERY_INSIDE_ENCODERS;
+        let timestamp_queries_supported = adapter.features().contains(timestamp_features);
+        let required_features = if timestamp_queries_supported {
+            timestamp_features
+        } else {
+            wgpu::Features::empty()
+        };
+
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
                 label: None,
-                required_features: wgpu::Features::empty(),
+                required_features,
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 required_limits: wgpu::Limits::default(),
                 memory_hints: Default::default(),
@@ -51,7 +61,10 @@ impl GraphicsContext {
             .copied()
             .unwrap_or(surface_caps.formats[0]);
 
-        let present_mode = if surface_caps.present_modes.contains(&wgpu::PresentMode::Immediate) {
+        let present_mode = if surface_caps
+            .present_modes
+            .contains(&wgpu::PresentMode::Immediate)
+        {
             wgpu::PresentMode::Immediate
         } else {
             tracing::warn!(
@@ -78,6 +91,7 @@ impl GraphicsContext {
             device,
             queue,
             config,
+            timestamp_queries_supported,
         })
     }
 
@@ -133,5 +147,9 @@ impl GraphicsContext {
 
     pub fn surface_format(&self) -> wgpu::TextureFormat {
         self.config.format
+    }
+
+    pub fn timestamp_queries_supported(&self) -> bool {
+        self.timestamp_queries_supported
     }
 }

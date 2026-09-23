@@ -1,8 +1,10 @@
+use std::time::Instant;
+
 use anyhow::Result;
 
 use crate::{
     camera::CameraRig,
-    debug::DebugUi,
+    debug::{DebugUi, ProfileStage},
     graphics::{
         GraphicsContext,
         bindings::{FrameGpu, ObjectGpu, ToneMappingBinding},
@@ -17,6 +19,7 @@ use crate::{
             sky::{SkyPass, SkyPassInput},
             tonemapping::{ToneMappingPass, ToneMappingPassInput},
         },
+        profiler::GpuProfiler,
         targets::{DepthTarget, LuminanceTarget, SceneColorTarget, ShadowTarget},
     },
     scene::Scene,
@@ -124,6 +127,7 @@ pub(crate) struct Renderer {
     tonemapping_binding: ToneMappingBinding,
     tonemapping_pass: ToneMappingPass,
     controls: RendererControls,
+    gpu_profiler: GpuProfiler,
 }
 
 pub(crate) struct RenderFrame<'a> {
@@ -196,6 +200,7 @@ impl Renderer {
             tonemapping_binding,
             tonemapping_pass,
             controls: RendererControls::new(),
+            gpu_profiler: GpuProfiler::new(graphics),
         }
     }
 
@@ -285,6 +290,13 @@ impl Renderer {
         graphics: &mut GraphicsContext,
         frame: RenderFrame<'_>,
     ) -> Result<()> {
+        self.gpu_profiler.poll(graphics.device());
+        if let Some(values) = self.gpu_profiler.take_latest() {
+            frame.debug.record_gpu_times(values);
+        } else if !self.gpu_profiler.supported() {
+            frame.debug.gpu_timestamps_unavailable();
+        }
+
         let Some(output) = graphics.acquire_frame()? else {
             return Ok(());
         };
@@ -297,6 +309,7 @@ impl Renderer {
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
+        self.gpu_profiler.begin_frame();
 
         let depth_view = self.depth_target.view();
         let resolve_view = self.scene_color_target.resolve_view();
@@ -304,6 +317,9 @@ impl Renderer {
         let shadow_frame_bind_group = self.frame_gpu.shadow_bind_group();
         let object_bind_group = self.object_gpu.bind_group();
 
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::Shadow);
         if frame.voxel.needs_shadow_pass() {
             self.shadow_pass.record(
                 &mut encoder,
@@ -317,9 +333,23 @@ impl Renderer {
                 },
             );
         }
+        self.gpu_profiler
+            .write_end(&mut encoder, ProfileStage::Shadow);
+        frame.debug.record_cpu_time(ProfileStage::Shadow, started);
 
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::VoxelLighting);
         frame.voxel.record_lighting(&mut encoder, frame_bind_group);
+        self.gpu_profiler
+            .write_end(&mut encoder, ProfileStage::VoxelLighting);
+        frame
+            .debug
+            .record_cpu_time(ProfileStage::VoxelLighting, started);
 
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::Sky);
         self.sky_pass.record(
             &mut encoder,
             SkyPassInput {
@@ -327,7 +357,12 @@ impl Renderer {
                 frame_bind_group: self.frame_gpu.sky_bind_group(),
             },
         );
+        self.gpu_profiler.write_end(&mut encoder, ProfileStage::Sky);
+        frame.debug.record_cpu_time(ProfileStage::Sky, started);
 
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::Geometry);
         if !frame.voxel.uses_solid_debug() {
             self.geometry_pass.record(
                 &mut encoder,
@@ -344,7 +379,13 @@ impl Renderer {
                 },
             );
         }
+        self.gpu_profiler
+            .write_end(&mut encoder, ProfileStage::Geometry);
+        frame.debug.record_cpu_time(ProfileStage::Geometry, started);
 
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::VoxelDebug);
         frame.voxel.record_debug(
             queue,
             &mut encoder,
@@ -353,7 +394,15 @@ impl Renderer {
             depth_view,
             frame_bind_group,
         );
+        self.gpu_profiler
+            .write_end(&mut encoder, ProfileStage::VoxelDebug);
+        frame
+            .debug
+            .record_cpu_time(ProfileStage::VoxelDebug, started);
 
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::Lut);
         if self.lut.needs_update() {
             self.lut_pass.record(
                 &mut encoder,
@@ -364,7 +413,12 @@ impl Renderer {
             );
             self.lut.mark_updated();
         }
+        self.gpu_profiler.write_end(&mut encoder, ProfileStage::Lut);
+        frame.debug.record_cpu_time(ProfileStage::Lut, started);
 
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::Luminance);
         self.luminance_pass.record(
             &mut encoder,
             LuminancePassInput {
@@ -372,7 +426,23 @@ impl Renderer {
                 target: &self.luminance_target,
             },
         );
+        self.gpu_profiler
+            .write_end(&mut encoder, ProfileStage::Luminance);
+        frame
+            .debug
+            .record_cpu_time(ProfileStage::Luminance, started);
+
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::Exposure);
         self.exposure_pass.record(&mut encoder);
+        self.gpu_profiler
+            .write_end(&mut encoder, ProfileStage::Exposure);
+        frame.debug.record_cpu_time(ProfileStage::Exposure, started);
+
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::Tonemapping);
         self.tonemapping_pass.record(
             &mut encoder,
             ToneMappingPassInput {
@@ -380,7 +450,15 @@ impl Renderer {
                 target_view: &surface_view,
             },
         );
+        self.gpu_profiler
+            .write_end(&mut encoder, ProfileStage::Tonemapping);
+        frame
+            .debug
+            .record_cpu_time(ProfileStage::Tonemapping, started);
 
+        let started = Instant::now();
+        self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::Egui);
         frame.debug.render(
             device,
             queue,
@@ -388,8 +466,13 @@ impl Renderer {
             &surface_view,
             [graphics.width(), graphics.height()],
         );
+        self.gpu_profiler
+            .write_end(&mut encoder, ProfileStage::Egui);
+        frame.debug.record_cpu_time(ProfileStage::Egui, started);
 
+        let gpu_slot = self.gpu_profiler.resolve(&mut encoder);
         queue.submit(std::iter::once(encoder.finish()));
+        self.gpu_profiler.submitted(gpu_slot);
         queue.present(output);
         Ok(())
     }

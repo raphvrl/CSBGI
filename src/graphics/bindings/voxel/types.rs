@@ -59,8 +59,7 @@ pub struct GpuVoxelGrid {
 #[derive(Clone, Copy, Debug, Pod, Zeroable, PartialEq)]
 pub struct GpuVoxelTraceSettings {
     pub cone_count: u32,
-    pub max_steps: u32,
-    pub _padding0: [u32; 2],
+    pub _padding0: [u32; 3],
     pub max_distance: f32,
     pub cone_angle: f32,
     pub intensity: f32,
@@ -71,10 +70,9 @@ impl Default for GpuVoxelTraceSettings {
     fn default() -> Self {
         Self {
             cone_count: 5,
-            max_steps: 6,
-            _padding0: [0; 2],
-            max_distance: 16.0,
-            cone_angle: 0.35,
+            _padding0: [0; 3],
+            max_distance: 100.0,
+            cone_angle: 1.0471976,
             intensity: 1.0,
             _padding1: 0.0,
         }
