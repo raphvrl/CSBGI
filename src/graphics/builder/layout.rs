@@ -116,17 +116,13 @@ impl<'device> BindGroupLayoutBuilder<'device> {
     }
 
     pub fn sampler(mut self) -> Self {
-        self.set_type(wgpu::BindingType::Sampler(
-            wgpu::SamplerBindingType::Filtering,
-        ));
+        self.set_type(wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering));
 
         self
     }
 
     pub fn non_filtering_sampler(mut self) -> Self {
-        self.set_type(wgpu::BindingType::Sampler(
-            wgpu::SamplerBindingType::NonFiltering,
-        ));
+        self.set_type(wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering));
 
         self
     }
@@ -235,6 +231,21 @@ impl<'device> BindGroupLayoutBuilder<'device> {
         self
     }
 
+    pub fn storage_texture(
+        mut self,
+        format: wgpu::TextureFormat,
+        access: wgpu::StorageTextureAccess,
+        view_dimension: wgpu::TextureViewDimension,
+    ) -> Self {
+        self.set_type(wgpu::BindingType::StorageTexture {
+            access,
+            format,
+            view_dimension,
+        });
+
+        self
+    }
+
     pub fn visibility(mut self, visibility: wgpu::ShaderStages) -> Self {
         self.active_entry_mut().visibility |= visibility;
         self
@@ -269,10 +280,7 @@ impl<'device> BindGroupLayoutBuilder<'device> {
             .into_iter()
             .map(|entry| {
                 let ty = entry.ty.unwrap_or_else(|| {
-                    panic!(
-                        "BindGroupLayoutBuilder: binding {} has no type",
-                        entry.binding
-                    )
+                    panic!("BindGroupLayoutBuilder: binding {} has no type", entry.binding)
                 });
 
                 if entry.visibility.is_empty() {

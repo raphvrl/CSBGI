@@ -24,6 +24,7 @@ pub struct GeometryPassInput<'a> {
     pub resolve_view: &'a wgpu::TextureView,
     pub depth_view: &'a wgpu::TextureView,
     pub frame_bind_group: &'a wgpu::BindGroup,
+    pub voxel_sampling_bind_group: &'a wgpu::BindGroup,
     pub object_bind_group: &'a wgpu::BindGroup,
     pub material_assets: &'a MaterialAssets,
     pub mesh_draws: &'a [MeshDraw],
@@ -40,6 +41,7 @@ impl GeometryPass {
         frame_layout: &wgpu::BindGroupLayout,
         object_layout: &wgpu::BindGroupLayout,
         material_layout: &wgpu::BindGroupLayout,
+        voxel_sampling_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let device = graphics.device();
 
@@ -55,6 +57,7 @@ impl GeometryPass {
             .bind_group_layout(frame_layout)
             .bind_group_layout(object_layout)
             .bind_group_layout(material_layout)
+            .bind_group_layout(voxel_sampling_layout)
             .vertex_layout(Vertex::layout())
             .primitive(wgpu::PrimitiveState {
                 topology: wgpu::PrimitiveTopology::TriangleList,
@@ -94,6 +97,7 @@ impl GeometryPass {
         rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, input.frame_bind_group, &[]);
         rpass.set_bind_group(1, input.object_bind_group, &[]);
+        rpass.set_bind_group(3, input.voxel_sampling_bind_group, &[]);
 
         for (instance, item) in input.mesh_draws.iter().enumerate() {
             if let (Some(mesh), Some(material)) = (

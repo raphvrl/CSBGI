@@ -79,12 +79,7 @@ impl MipmapGenerator {
         }
     }
 
-    pub fn generate(
-        &self,
-        device: &wgpu::Device,
-        encoder: &mut wgpu::CommandEncoder,
-        texture: &Texture,
-    ) {
+    pub fn generate(&self, device: &wgpu::Device, encoder: &mut wgpu::CommandEncoder, texture: &Texture) {
         let format = texture.format();
         let pipeline = match format {
             wgpu::TextureFormat::Rgba8UnormSrgb => &self.color_pipeline,

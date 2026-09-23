@@ -122,10 +122,7 @@ fn read_materials(document: &gltf::Document) -> Vec<MaterialData> {
                 color_factor: pbr.base_color_factor(),
                 metallic_factor: pbr.metallic_factor(),
                 roughness_factor: pbr.roughness_factor(),
-                occlusion_factor: occlusion
-                    .as_ref()
-                    .map(|info| info.strength())
-                    .unwrap_or(1.0),
+                occlusion_factor: occlusion.as_ref().map(|info| info.strength()).unwrap_or(1.0),
                 color_image,
                 normal_image: normal.as_ref().map(|info| info.texture().source().index()),
                 orm_image,
@@ -166,10 +163,7 @@ fn read_meshes(
     Ok((meshes, mesh_map))
 }
 
-fn read_scene(
-    document: &gltf::Document,
-    mesh_map: &[Vec<usize>],
-) -> Result<(Vec<NodeData>, Vec<usize>)> {
+fn read_scene(document: &gltf::Document, mesh_map: &[Vec<usize>]) -> Result<(Vec<NodeData>, Vec<usize>)> {
     let nodes = document
         .nodes()
         .map(|node| {
@@ -294,17 +288,9 @@ fn read_primitive(
 
 fn fallback_tangent(normal: [f32; 3]) -> [f32; 4] {
     let normal = Vec3::from_array(normal).normalize_or_zero();
-    let reference = if normal.y.abs() < 0.999 {
-        Vec3::Y
-    } else {
-        Vec3::X
-    };
+    let reference = if normal.y.abs() < 0.999 { Vec3::Y } else { Vec3::X };
     let tangent = normal.cross(reference).normalize_or_zero();
-    let tangent = if tangent == Vec3::ZERO {
-        Vec3::X
-    } else {
-        tangent
-    };
+    let tangent = if tangent == Vec3::ZERO { Vec3::X } else { tangent };
 
     [tangent.x, tangent.y, tangent.z, 1.0]
 }

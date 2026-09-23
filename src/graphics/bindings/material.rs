@@ -55,6 +55,14 @@ pub struct MaterialGpu {
     bind_group: wgpu::BindGroup,
 }
 
+pub struct MaterialParameters {
+    pub base_color_factor: [f32; 4],
+    pub normal_scale: f32,
+    pub metallic_factor: f32,
+    pub roughness_factor: f32,
+    pub occlusion_factor: f32,
+}
+
 impl MaterialGpu {
     pub fn new(
         graphics: &GraphicsContext,
@@ -62,17 +70,18 @@ impl MaterialGpu {
         color_texture: &Texture,
         normal_texture: &Texture,
         orm_texture: &Texture,
-        base_color_factor: [f32; 4],
-        normal_scale: f32,
-        metallic_factor: f32,
-        roughness_factor: f32,
-        occlusion_factor: f32,
+        parameters: MaterialParameters,
     ) -> Self {
         let device = graphics.device();
         let uniform = MaterialUniform {
-            base_color_factor,
-            normal_scale: [normal_scale, 0.0, 0.0, 0.0],
-            pbr_factors: [metallic_factor, roughness_factor, occlusion_factor, 0.0],
+            base_color_factor: parameters.base_color_factor,
+            normal_scale: [parameters.normal_scale, 0.0, 0.0, 0.0],
+            pbr_factors: [
+                parameters.metallic_factor,
+                parameters.roughness_factor,
+                parameters.occlusion_factor,
+                0.0,
+            ],
         };
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {

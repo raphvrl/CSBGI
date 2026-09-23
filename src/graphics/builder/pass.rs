@@ -30,10 +30,7 @@ impl<'encoder> ComputePassBuilder<'encoder> {
         self
     }
 
-    pub fn timestamp_writes(
-        mut self,
-        timestamp_writes: wgpu::ComputePassTimestampWrites<'encoder>,
-    ) -> Self {
+    pub fn timestamp_writes(mut self, timestamp_writes: wgpu::ComputePassTimestampWrites<'encoder>) -> Self {
         self.timestamp_writes = Some(timestamp_writes);
         self
     }
@@ -121,13 +118,12 @@ impl<'encoder> RenderPassBuilder<'encoder> {
     pub fn color(mut self, view: &'encoder wgpu::TextureView) -> Self {
         let index = self.color_attachments.len();
 
-        self.color_attachments
-            .push(Some(wgpu::RenderPassColorAttachment {
-                view,
-                resolve_target: None,
-                depth_slice: None,
-                ops: default_operations(),
-            }));
+        self.color_attachments.push(Some(wgpu::RenderPassColorAttachment {
+            view,
+            resolve_target: None,
+            depth_slice: None,
+            ops: default_operations(),
+        }));
 
         self.active_attachment = Some(ActiveAttachment::Color(index));
         self
@@ -193,8 +189,7 @@ impl<'encoder> RenderPassBuilder<'encoder> {
                     .get_or_insert(default_operations())
                     .load = wgpu::LoadOp::Clear(stencil);
             }
-            (Some(ActiveAttachment::Color(_)), _)
-            | (Some(ActiveAttachment::Depth), ClearValue::Color(_)) => {
+            (Some(ActiveAttachment::Color(_)), _) | (Some(ActiveAttachment::Depth), ClearValue::Color(_)) => {
                 panic!("RenderPassBuilder: invalid clear value for active attachment")
             }
             (None, _) => {
@@ -295,18 +290,13 @@ impl<'encoder> RenderPassBuilder<'encoder> {
         })
     }
 
-    fn color_attachment_mut(
-        &mut self,
-        index: usize,
-    ) -> &mut wgpu::RenderPassColorAttachment<'encoder> {
+    fn color_attachment_mut(&mut self, index: usize) -> &mut wgpu::RenderPassColorAttachment<'encoder> {
         self.color_attachments[index]
             .as_mut()
             .expect("RenderPassBuilder: invalid color attachment index")
     }
 
-    fn active_depth_attachment_mut(
-        &mut self,
-    ) -> &mut wgpu::RenderPassDepthStencilAttachment<'encoder> {
+    fn active_depth_attachment_mut(&mut self) -> &mut wgpu::RenderPassDepthStencilAttachment<'encoder> {
         match self.active_attachment {
             Some(ActiveAttachment::Depth) => {}
             Some(ActiveAttachment::Color(_)) => {

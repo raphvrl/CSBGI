@@ -43,8 +43,7 @@ impl ToneMappingBinding {
             ..Default::default()
         });
 
-        let bind_group =
-            Self::create_bind_group(device, &layout, source_view, &sampler, exposure_buffer);
+        let bind_group = Self::create_bind_group(device, &layout, source_view, &sampler, exposure_buffer);
 
         Self {
             layout,
@@ -59,13 +58,8 @@ impl ToneMappingBinding {
         source_view: &wgpu::TextureView,
         exposure_buffer: &wgpu::Buffer,
     ) {
-        self.bind_group = Self::create_bind_group(
-            device,
-            &self.layout,
-            source_view,
-            &self.sampler,
-            exposure_buffer,
-        );
+        self.bind_group =
+            Self::create_bind_group(device, &self.layout, source_view, &self.sampler, exposure_buffer);
     }
 
     pub fn layout(&self) -> &wgpu::BindGroupLayout {

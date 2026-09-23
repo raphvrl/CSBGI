@@ -4,6 +4,7 @@ import package::common::normal::{matrix, tangent};
 import package::common::object::ObjectUniform;
 import package::common::shadow::visibility;
 import package::common::vertex::{VertexInput, VertexOutput};
+import package::common::voxel::cone::trace_diffuse;
 import package::surface::pbr::{calculate, MaterialData};
 
 @group(0) @binding(0)
@@ -92,6 +93,11 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         input.light_position,
     );
 
+    let indirect_radiance = trace_diffuse(
+        input.world_position,
+        normal,
+    );
+
     let color = calculate(
         normal,
         input.world_position,
@@ -103,6 +109,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         frame.camera,
         frame.light,
         shadow,
+        indirect_radiance,
     );
 
     return vec4<f32>(color, base_color.a);

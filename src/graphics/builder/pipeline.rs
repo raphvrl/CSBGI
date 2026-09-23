@@ -69,13 +69,11 @@ impl<'device> ComputePipelineBuilder<'device> {
         let shader = shader.expect("ComputePipelineBuilder: shader is required");
 
         let generated_layout = if layout.is_none() {
-            Some(
-                device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    label: label.as_deref(),
-                    bind_group_layouts: &bind_group_layouts,
-                    immediate_size: 0,
-                }),
-            )
+            Some(device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: label.as_deref(),
+                bind_group_layouts: &bind_group_layouts,
+                immediate_size: 0,
+            }))
         } else {
             None
         };
@@ -220,9 +218,7 @@ impl<'device> RenderPipelineBuilder<'device> {
     }
 
     pub fn build(mut self) -> wgpu::RenderPipeline {
-        let shader = self
-            .shader
-            .expect("RenderPipelineBuilder: shader is required");
+        let shader = self.shader.expect("RenderPipelineBuilder: shader is required");
 
         let generated_layout = if self.layout.is_none() {
             Some(
@@ -248,9 +244,7 @@ impl<'device> RenderPipelineBuilder<'device> {
         });
 
         let fragment = self.fragment_entry_point.as_deref().map(|entry_point| {
-            let targets = targets
-                .as_ref()
-                .map_or(&[][..], |targets| targets.as_slice());
+            let targets = targets.as_ref().map_or(&[][..], |targets| targets.as_slice());
 
             wgpu::FragmentState {
                 module: shader,

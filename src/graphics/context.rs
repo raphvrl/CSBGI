@@ -51,10 +51,7 @@ impl GraphicsContext {
             .copied()
             .unwrap_or(surface_caps.formats[0]);
 
-        let present_mode = if surface_caps
-            .present_modes
-            .contains(&wgpu::PresentMode::Immediate)
-        {
+        let present_mode = if surface_caps.present_modes.contains(&wgpu::PresentMode::Immediate) {
             wgpu::PresentMode::Immediate
         } else {
             tracing::warn!(

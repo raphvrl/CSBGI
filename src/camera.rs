@@ -5,6 +5,7 @@ pub use controller::CameraController;
 pub use projection::Projection;
 
 use glam::{Mat4, Quat, Vec3, camera::rh::view};
+use winit::keyboard::KeyCode;
 
 #[derive(Clone, Copy)]
 pub struct CameraExposureSettings {
@@ -82,5 +83,57 @@ impl Camera {
         }
 
         self.projection.resize(width, height);
+    }
+}
+
+pub struct CameraRig {
+    camera: Camera,
+    exposure: CameraExposureSettings,
+    controller: CameraController,
+}
+
+impl CameraRig {
+    pub(crate) fn new(width: u32, height: u32) -> Self {
+        let aspect_ratio = width as f32 / height as f32;
+        let projection = Projection::perspective(60.0_f32.to_radians(), aspect_ratio, 0.1, 100.0);
+        let camera = Camera::new(Vec3::new(0.0, 0.0, 2.0), Quat::IDENTITY, projection);
+
+        Self {
+            camera,
+            exposure: CameraExposureSettings::default(),
+            controller: CameraController::new(5.0, 0.003),
+        }
+    }
+
+    pub(crate) fn update(&mut self, dt: f32) {
+        self.controller.update(&mut self.camera, dt);
+    }
+
+    pub(crate) fn resize(&mut self, width: u32, height: u32) {
+        self.camera.resize(width, height);
+    }
+
+    pub(crate) fn on_key(&mut self, key: KeyCode, pressed: bool) {
+        self.controller.on_key(key, pressed);
+    }
+
+    pub(crate) fn on_mouse_motion(&mut self, delta: (f64, f64)) {
+        self.controller.on_mouse_motion(delta);
+    }
+
+    pub(crate) fn set_active(&mut self, active: bool) {
+        self.controller.set_active(active);
+    }
+
+    pub(crate) fn camera(&self) -> &Camera {
+        &self.camera
+    }
+
+    pub(crate) fn exposure_settings_mut(&mut self) -> &mut CameraExposureSettings {
+        &mut self.exposure
+    }
+
+    pub(crate) fn exposure_stops(&self) -> f32 {
+        self.exposure.exposure_stops()
     }
 }

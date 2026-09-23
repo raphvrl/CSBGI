@@ -38,17 +38,14 @@ impl ApplicationHandler for App {
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
 
-        self.state = Some(
-            pollster::block_on(State::new(window)).expect("Failed to initialize application state"),
-        );
+        let state =
+            pollster::block_on(State::new(window.clone())).expect("Failed to initialize application state");
+
+        window.request_redraw();
+        self.state = Some(state);
     }
 
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        window_id: WindowId,
-        event: WindowEvent,
-    ) {
+    fn window_event(&mut self, event_loop: &ActiveEventLoop, window_id: WindowId, event: WindowEvent) {
         let state = match &mut self.state {
             Some(state) => state,
             None => return,
@@ -104,12 +101,7 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn device_event(
-        &mut self,
-        _event_loop: &ActiveEventLoop,
-        _device_id: DeviceId,
-        event: DeviceEvent,
-    ) {
+    fn device_event(&mut self, _event_loop: &ActiveEventLoop, _device_id: DeviceId, event: DeviceEvent) {
         if let DeviceEvent::MouseMotion { delta } = event
             && let Some(state) = &mut self.state
         {

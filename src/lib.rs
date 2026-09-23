@@ -5,4 +5,6 @@ pub mod clock;
 pub mod debug;
 pub mod ecs;
 pub mod graphics;
+pub mod scene;
 pub mod state;
+pub mod voxel;

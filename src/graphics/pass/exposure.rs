@@ -53,6 +53,7 @@ pub struct ExposurePass {
     params_buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
     settings: ExposureSettings,
+    enabled: bool,
 }
 
 impl ExposurePass {
@@ -116,14 +117,11 @@ impl ExposurePass {
             params_buffer,
             bind_group,
             settings: ExposureSettings::default(),
+            enabled: true,
         }
     }
 
-    pub fn update_luminance(
-        &mut self,
-        graphics: &GraphicsContext,
-        luminance_view: &wgpu::TextureView,
-    ) {
+    pub fn update_luminance(&mut self, graphics: &GraphicsContext, luminance_view: &wgpu::TextureView) {
         self.bind_group = Self::create_bind_group(
             graphics.device(),
             &self.bind_group_layout,
@@ -147,7 +145,19 @@ impl ExposurePass {
         queue.write_buffer(&self.params_buffer, 0, bytemuck::bytes_of(&params));
     }
 
+    pub fn set_manual_exposure(&self, queue: &wgpu::Queue, exposure_stops: f32) {
+        let state = ExposureState {
+            exposure: exposure_stops,
+        };
+
+        queue.write_buffer(&self.state_buffer, 0, bytemuck::bytes_of(&state));
+    }
+
     pub fn record(&self, encoder: &mut wgpu::CommandEncoder) {
+        if !self.enabled {
+            return;
+        }
+
         let mut compute_pass = encoder
             .compute_pass_builder()
             .label("Exposure Compute Pass")
@@ -164,6 +174,14 @@ impl ExposurePass {
 
     pub fn settings_mut(&mut self) -> &mut ExposureSettings {
         &mut self.settings
+    }
+
+    pub fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+    }
+
+    pub fn enabled(&self) -> bool {
+        self.enabled
     }
 
     fn create_bind_group(

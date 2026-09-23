@@ -21,11 +21,7 @@ pub struct LuminancePassInput<'a> {
 }
 
 impl LuminancePass {
-    pub fn new(
-        graphics: &GraphicsContext,
-        scene_view: &wgpu::TextureView,
-        target: &LuminanceTarget,
-    ) -> Self {
+    pub fn new(graphics: &GraphicsContext, scene_view: &wgpu::TextureView, target: &LuminanceTarget) -> Self {
         let device = graphics.device();
 
         #[rustfmt::skip]

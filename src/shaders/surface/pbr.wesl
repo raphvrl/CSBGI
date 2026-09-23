@@ -63,6 +63,7 @@ fn calculate(
     camera: Camera,
     light: Light,
     shadow: f32,
+    indirect_radiance: vec3<f32>,
 ) -> vec3<f32> {
     let occlusion = clamp(material.factors.z, 0.0, 1.0);
     let base_roughness = clamp(material.orm.g * material.factors.y, 0.04, 1.0);
@@ -102,6 +103,7 @@ fn calculate(
         * light.light_color
         * lux_to_render(light.ambient_illuminance_lux)
         * occlusion;
+    let indirect_diffuse = material.albedo / PI * indirect_radiance;
 
-    return direct_light + ambient_light;
+    return direct_light + ambient_light + indirect_diffuse;
 }

@@ -71,14 +71,17 @@ impl FrameGpu {
                 .uniform()
                 .vertex()
                 .fragment()
+                .compute()
             .entry(1)
                 .texture()
                 .depth()
                 .fragment()
+                .compute()
             .entry(2)
                 .sampler()
                 .comparison()
                 .fragment()
+                .compute()
             .build();
 
         #[rustfmt::skip]
@@ -177,12 +180,7 @@ impl FrameGpu {
         }
     }
 
-    pub fn update_depth_target(
-        &mut self,
-        graphics: &GraphicsContext,
-        depth_target: &DepthTarget,
-        lut: &Lut,
-    ) {
+    pub fn update_depth_target(&mut self, graphics: &GraphicsContext, depth_target: &DepthTarget, lut: &Lut) {
         self.sky_bind_group = graphics
             .device()
             .bind_group_builder()

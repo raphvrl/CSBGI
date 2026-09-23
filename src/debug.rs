@@ -8,12 +8,27 @@ use winit::{event::WindowEvent, window::Window};
 use crate::camera::CameraExposureSettings;
 use crate::graphics::{
     GraphicsContext,
+    bindings::GpuVoxelTraceSettings,
     lighting::DirectionalLight,
     pass::egui::{EguiPass, EguiPassInput},
     pass::exposure::ExposureSettings,
 };
 
-pub use data::DebugSnapshot;
+pub use data::{DebugSnapshot, VoxelDebugMode};
+
+pub struct DebugInput<'a> {
+    pub light: &'a mut DirectionalLight,
+    pub exposure: &'a mut ExposureSettings,
+    pub camera_exposure: &'a mut CameraExposureSettings,
+    pub voxel_debug_enabled: &'a mut bool,
+    pub occupied_voxel_debug_enabled: &'a mut bool,
+    pub voxel_debug_mode: &'a mut VoxelDebugMode,
+    pub mip_debug_enabled: &'a mut bool,
+    pub mip_level: &'a mut u32,
+    pub voxel_trace_settings: &'a mut GpuVoxelTraceSettings,
+    pub auto_exposure_enabled: &'a mut bool,
+    pub manual_exposure: &'a mut f32,
+}
 
 pub struct DebugUi {
     context: Context,
@@ -66,14 +81,7 @@ impl DebugUi {
         self.visible = !self.visible;
     }
 
-    pub fn prepare(
-        &mut self,
-        window: &Window,
-        snapshot: DebugSnapshot,
-        light: &mut DirectionalLight,
-        exposure: &mut ExposureSettings,
-        camera_exposure: &mut CameraExposureSettings,
-    ) {
+    pub fn prepare(&mut self, window: &Window, snapshot: DebugSnapshot, mut input: DebugInput<'_>) {
         self.snapshot_timer += snapshot.delta_time;
 
         if self.snapshot_timer >= 0.1 || self.displayed_snapshot.delta_time == 0.0 {
@@ -81,29 +89,19 @@ impl DebugUi {
             self.snapshot_timer = 0.0;
         }
 
-        let input = self.winit.take_egui_input(window);
+        let egui_input = self.winit.take_egui_input(window);
         let context = self.context.clone();
         let visible = self.visible;
         let displayed_snapshot = self.displayed_snapshot;
 
-        let output = context.run_ui(input, |ui| {
-            panels::show(
-                ui,
-                visible,
-                &displayed_snapshot,
-                light,
-                exposure,
-                camera_exposure,
-            );
+        let output = context.run_ui(egui_input, |ui| {
+            panels::show(ui, visible, &displayed_snapshot, &mut input);
         });
 
-        self.winit
-            .handle_platform_output(window, output.platform_output);
+        self.winit.handle_platform_output(window, output.platform_output);
 
         self.pixels_per_point = output.pixels_per_point;
-        self.paint_jobs = self
-            .context
-            .tessellate(output.shapes, output.pixels_per_point);
+        self.paint_jobs = self.context.tessellate(output.shapes, output.pixels_per_point);
         self.textures_delta.clear();
         self.textures_delta = output.textures_delta;
     }

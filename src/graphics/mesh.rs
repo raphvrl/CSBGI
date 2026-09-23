@@ -146,12 +146,7 @@ impl Mesh {
     }
 }
 
-fn add_face(
-    vertices: &mut Vec<Vertex>,
-    indices: &mut Vec<u32>,
-    positions: [Vec3; 4],
-    normal: Vec3,
-) {
+fn add_face(vertices: &mut Vec<Vertex>, indices: &mut Vec<u32>, positions: [Vec3; 4], normal: Vec3) {
     let start = vertices.len() as u32;
 
     vertices.extend(positions.into_iter().map(|position| Vertex {
@@ -165,11 +160,7 @@ fn add_face(
 }
 
 fn tangent_from_normal(normal: Vec3) -> Vec4 {
-    let reference = if normal.y.abs() < 0.999 {
-        Vec3::Y
-    } else {
-        Vec3::X
-    };
+    let reference = if normal.y.abs() < 0.999 { Vec3::Y } else { Vec3::X };
     let tangent = normal.cross(reference).normalize_or_zero();
 
     Vec4::new(tangent.x, tangent.y, tangent.z, 1.0)

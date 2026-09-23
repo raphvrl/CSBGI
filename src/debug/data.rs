@@ -5,3 +5,12 @@ pub struct DebugSnapshot {
     pub draw_count: usize,
     pub camera_position: glam::Vec3,
 }
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum VoxelDebugMode {
+    #[default]
+    WhiteEdges,
+    AlbedoFaces,
+    NormalFaces,
+    RadianceFaces,
+}

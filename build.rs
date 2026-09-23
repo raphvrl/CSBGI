@@ -13,4 +13,8 @@ fn main() {
     build_shader("package::passes::luminance", "luminance");
     build_shader("package::passes::reduce", "reduce");
     build_shader("package::passes::exposure", "exposure");
+    build_shader("package::passes::debug::voxel", "debug_voxel");
+    build_shader("package::passes::voxel::lighting", "voxel_lighting");
+    build_shader("package::passes::voxel::base", "voxel_mipmap_base");
+    build_shader("package::passes::voxel::mip", "voxel_mipmap");
 }

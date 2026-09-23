@@ -28,11 +28,7 @@ impl Texture {
             .ok_or_else(|| anyhow::anyhow!("texture dimensions overflow"))?;
 
         if data.len() != expected_len {
-            bail!(
-                "texture has {} bytes, expected {}",
-                data.len(),
-                expected_len
-            );
+            bail!("texture has {} bytes, expected {}", data.len(), expected_len);
         }
 
         let size = wgpu::Extent3d {

@@ -8,7 +8,7 @@ use crate::{
     },
     graphics::{
         GraphicsContext,
-        bindings::{MaterialGpu, MaterialLayout},
+        bindings::{MaterialGpu, MaterialLayout, MaterialParameters},
     },
 };
 
@@ -42,11 +42,13 @@ impl MaterialAssets {
             white_texture,
             flat_normal_texture,
             default_orm_texture,
-            [1.0; 4],
-            1.0,
-            0.0,
-            1.0,
-            1.0,
+            MaterialParameters {
+                base_color_factor: [1.0; 4],
+                normal_scale: 1.0,
+                metallic_factor: 0.0,
+                roughness_factor: 1.0,
+                occlusion_factor: 1.0,
+            },
         );
 
         let mut assets = Self {
@@ -85,11 +87,13 @@ impl MaterialAssets {
                 color_texture,
                 normal_texture,
                 orm_texture,
-                material.color_factor,
-                material.normal_scale,
-                material.metallic_factor,
-                material.roughness_factor,
-                material.occlusion_factor,
+                MaterialParameters {
+                    base_color_factor: material.color_factor,
+                    normal_scale: material.normal_scale,
+                    metallic_factor: material.metallic_factor,
+                    roughness_factor: material.roughness_factor,
+                    occlusion_factor: material.occlusion_factor,
+                },
             );
 
             let handle = MaterialHandle::new(assets.materials.len());

@@ -36,12 +36,7 @@ pub struct DirectionalLight {
 }
 
 impl DirectionalLight {
-    pub fn new(
-        direction: Vec3,
-        color: Vec3,
-        illuminance_lux: f32,
-        ambient_illuminance_lux: f32,
-    ) -> Self {
+    pub fn new(direction: Vec3, color: Vec3, illuminance_lux: f32, ambient_illuminance_lux: f32) -> Self {
         let sun_direction = -direction.normalize_or_zero();
         let horizontal = Vec3::new(sun_direction.x, 0.0, sun_direction.z).length();
         let rise = horizontal
@@ -111,7 +106,7 @@ impl Default for DirectionalLight {
             Vec3::new(-1.0, -1.0, -1.0).normalize(),
             Vec3::ONE,
             REFERENCE_ILLUMINANCE_LUX,
-            10_000.0,
+            0.0,
         )
     }
 }

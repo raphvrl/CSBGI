@@ -26,12 +26,11 @@ impl TextureAssets {
         images: &[ImageData],
         materials: &[MaterialData],
     ) -> Result<Self> {
-        let mut encoder =
-            graphics
-                .device()
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Texture Upload Encoder"),
-                });
+        let mut encoder = graphics
+            .device()
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Texture Upload Encoder"),
+            });
 
         let white_texture = Texture::from_rgba8(
             graphics.device(),
