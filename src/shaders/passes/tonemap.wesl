@@ -50,3 +50,8 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
 
     return vec4<f32>(output_color, scene_color.a);
 }
+
+@fragment
+fn fs_debug(input: VertexOutput) -> @location(0) vec4<f32> {
+    return textureSample(scene_texture, scene_sampler, input.uv);
+}

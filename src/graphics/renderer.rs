@@ -3,10 +3,10 @@ use std::time::Instant;
 use anyhow::Result;
 
 use crate::{
-    camera::CameraRig,
+    camera::{Camera, CameraRig},
     debug::{DebugUi, ProfileStage},
     graphics::{
-        GraphicsContext,
+        Frustum, GraphicsContext,
         bindings::{FrameGpu, ObjectGpu, ToneMappingBinding},
         lighting::DirectionalLight,
         lut::Lut,
@@ -62,6 +62,7 @@ impl LutKey {
 struct RendererControls {
     auto_exposure_enabled: bool,
     manual_exposure: f32,
+    meshlet_debug_enabled: bool,
 }
 
 impl RendererControls {
@@ -69,6 +70,7 @@ impl RendererControls {
         Self {
             auto_exposure_enabled: true,
             manual_exposure: 0.0,
+            meshlet_debug_enabled: false,
         }
     }
 }
@@ -141,6 +143,7 @@ pub(crate) struct Renderer {
 
 pub(crate) struct RenderFrame<'a> {
     pub(crate) scene: &'a Scene,
+    pub(crate) camera: &'a Camera,
     pub(crate) voxel: &'a mut VoxelGi,
     pub(crate) debug: &'a mut DebugUi,
 }
@@ -228,7 +231,9 @@ impl Renderer {
         }
     }
 
-    pub(crate) fn debug_settings_mut(&mut self) -> (&mut ExposureSettings, &mut bool, &mut f32) {
+    pub(crate) fn debug_settings_mut(
+        &mut self,
+    ) -> (&mut ExposureSettings, &mut bool, &mut f32, &mut bool) {
         let Self {
             exposure_pass,
             controls,
@@ -238,6 +243,7 @@ impl Renderer {
             exposure_pass.settings_mut(),
             &mut controls.auto_exposure_enabled,
             &mut controls.manual_exposure,
+            &mut controls.meshlet_debug_enabled,
         )
     }
 
@@ -280,8 +286,9 @@ impl Renderer {
         let models = scene.model_matrices();
         self.object_gpu.update(graphics, &models);
 
-        self.exposure_pass
-            .set_enabled(self.controls.auto_exposure_enabled);
+        self.exposure_pass.set_enabled(
+            self.controls.auto_exposure_enabled && !self.controls.meshlet_debug_enabled,
+        );
 
         if self.controls.auto_exposure_enabled {
             self.exposure_pass
@@ -350,6 +357,8 @@ impl Renderer {
         let frame_bind_group = self.frame_gpu.bind_group();
         let shadow_frame_bind_group = self.frame_gpu.shadow_bind_group();
         let object_bind_group = self.object_gpu.bind_group();
+        let view_projection = frame.camera.projection_matrix() * frame.camera.view_matrix();
+        let frustum = Frustum::from_view_projection(view_projection);
 
         let started = Instant::now();
         self.gpu_profiler
@@ -407,7 +416,7 @@ impl Renderer {
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::DepthPrepass);
 
-        if !frame.voxel.uses_solid_debug() {
+        if !frame.voxel.uses_solid_debug() && !self.controls.meshlet_debug_enabled {
             self.depth_prepass.record(
                 &mut encoder,
                 DepthPrepassInput {
@@ -418,6 +427,7 @@ impl Renderer {
                     material_assets: frame.scene.material_assets(),
                     mesh_draws: frame.scene.draws(),
                     mesh_assets: frame.scene.mesh_assets(),
+                    frustum: &frustum,
                 },
             );
         }
@@ -446,6 +456,8 @@ impl Renderer {
                     material_assets: frame.scene.material_assets(),
                     mesh_draws: frame.scene.draws(),
                     mesh_assets: frame.scene.mesh_assets(),
+                    meshlet_debug_enabled: self.controls.meshlet_debug_enabled,
+                    frustum: &frustum,
                 },
             );
         }
@@ -533,6 +545,7 @@ impl Renderer {
             ToneMappingPassInput {
                 binding: &self.tonemapping_binding,
                 target_view: &surface_view,
+                meshlet_debug_enabled: self.controls.meshlet_debug_enabled,
             },
         );
 

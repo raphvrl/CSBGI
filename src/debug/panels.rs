@@ -44,6 +44,7 @@ pub fn show(
                 ));
                 ui.label(format!("Meshes: {}", snapshot.mesh_count));
                 ui.label(format!("Draw calls: {}", snapshot.draw_count));
+                ui.checkbox(input.meshlet_debug_enabled, "Show meshlets");
                 if ui.button("Open profiler").clicked() {
                     *profiler_visible = true;
                 }

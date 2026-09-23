@@ -8,11 +8,13 @@ use crate::graphics::{
 
 pub struct ToneMappingPass {
     pipeline: wgpu::RenderPipeline,
+    meshlet_debug_pipeline: wgpu::RenderPipeline,
 }
 
 pub struct ToneMappingPassInput<'a> {
     pub binding: &'a ToneMappingBinding,
     pub target_view: &'a wgpu::TextureView,
+    pub meshlet_debug_enabled: bool,
 }
 
 impl ToneMappingPass {
@@ -32,7 +34,19 @@ impl ToneMappingPass {
             .color_format(graphics.surface_format())
             .build();
 
-        Self { pipeline }
+        let meshlet_debug_pipeline = device
+            .render_pipeline_builder()
+            .label("Meshlet Debug Output Pipeline")
+            .shader(&shader)
+            .bind_group_layout(binding.layout())
+            .fragment_entry_point("fs_debug")
+            .color_format(graphics.surface_format())
+            .build();
+
+        Self {
+            pipeline,
+            meshlet_debug_pipeline,
+        }
     }
 
     pub fn record(&self, encoder: &mut wgpu::CommandEncoder, input: ToneMappingPassInput<'_>) {
@@ -44,7 +58,12 @@ impl ToneMappingPass {
             .store()
             .build();
 
-        rpass.set_pipeline(&self.pipeline);
+        let pipeline = if input.meshlet_debug_enabled {
+            &self.meshlet_debug_pipeline
+        } else {
+            &self.pipeline
+        };
+        rpass.set_pipeline(pipeline);
         rpass.set_bind_group(0, input.binding.bind_group(), &[]);
         rpass.draw(0..3, 0..1);
     }

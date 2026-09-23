@@ -32,6 +32,7 @@ pub struct DebugInput<'a> {
     pub voxel_trace_settings: &'a mut GpuVoxelTraceSettings,
     pub auto_exposure_enabled: &'a mut bool,
     pub manual_exposure: &'a mut f32,
+    pub meshlet_debug_enabled: &'a mut bool,
 }
 
 pub struct DebugUi {

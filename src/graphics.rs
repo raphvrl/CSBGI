@@ -1,6 +1,7 @@
 pub mod bindings;
 pub mod builder;
 pub mod context;
+pub mod frustum;
 pub mod lighting;
 pub mod lut;
 pub mod mesh;
@@ -16,5 +17,6 @@ pub use bindings::{
     VoxelGpu,
 };
 pub use context::GraphicsContext;
-pub use mesh::{Mesh, Vertex};
+pub use frustum::Frustum;
+pub use mesh::{Mesh, MeshletData, MeshletDebugVertex, MeshletDescriptor, Vertex};
 pub use texture::Texture;

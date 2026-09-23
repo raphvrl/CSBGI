@@ -3,7 +3,7 @@ use wesl::include_wesl;
 use crate::{
     assets::{MaterialAssets, MeshAssets},
     graphics::{
-        GraphicsContext, Vertex,
+        Frustum, GraphicsContext, Vertex,
         builder::{RenderPassExt, RenderPipelineExt},
         targets::{DepthTarget, MSAA_SAMPLES, SceneColorTarget},
     },
@@ -19,6 +19,7 @@ pub struct DepthPrepassInput<'a> {
     pub material_assets: &'a MaterialAssets,
     pub mesh_draws: &'a [MeshDraw],
     pub mesh_assets: &'a MeshAssets,
+    pub frustum: &'a Frustum,
 }
 
 pub struct DepthPrepass {
@@ -103,7 +104,7 @@ impl DepthPrepass {
                 };
                 render_pass.set_pipeline(pipeline);
                 render_pass.set_bind_group(2, material.bind_group(), &[]);
-                mesh.draw(&mut render_pass, instance as u32);
+                mesh.draw_culled(&mut render_pass, instance as u32, draw.model, input.frustum);
             }
         }
     }

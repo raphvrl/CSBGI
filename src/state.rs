@@ -97,7 +97,8 @@ impl State {
         self.debug
             .record_cpu_time(ProfileStage::ScenePreparation, started);
 
-        let (exposure, auto_exposure_enabled, manual_exposure) = self.renderer.debug_settings_mut();
+        let (exposure, auto_exposure_enabled, manual_exposure, meshlet_debug_enabled) =
+            self.renderer.debug_settings_mut();
         let (
             voxel_debug_enabled,
             occupied_voxel_debug_enabled,
@@ -127,6 +128,7 @@ impl State {
                 voxel_trace_settings,
                 auto_exposure_enabled,
                 manual_exposure,
+                meshlet_debug_enabled,
             },
         );
 
@@ -151,6 +153,7 @@ impl State {
             &mut self.graphics,
             RenderFrame {
                 scene: &self.scene,
+                camera: self.camera.camera(),
                 voxel: &mut self.voxel,
                 debug: &mut self.debug,
             },
