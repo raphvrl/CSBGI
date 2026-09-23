@@ -18,6 +18,7 @@ pub enum ProfileStage {
     Shadow,
     VoxelLighting,
     Sky,
+    DepthPrepass,
     Geometry,
     VoxelDebug,
     Lut,
@@ -28,7 +29,7 @@ pub enum ProfileStage {
 }
 
 impl ProfileStage {
-    pub const COUNT: usize = 15;
+    pub const COUNT: usize = 16;
     pub const RENDER_START: Self = Self::Shadow;
 
     pub const ALL: [Self; Self::COUNT] = [
@@ -40,6 +41,7 @@ impl ProfileStage {
         Self::Shadow,
         Self::VoxelLighting,
         Self::Sky,
+        Self::DepthPrepass,
         Self::Geometry,
         Self::VoxelDebug,
         Self::Lut,
@@ -59,6 +61,7 @@ impl ProfileStage {
             Self::Shadow => "Shadow pass",
             Self::VoxelLighting => "Voxel lighting + mipmaps",
             Self::Sky => "Sky pass",
+            Self::DepthPrepass => "Depth prepass",
             Self::Geometry => "Geometry pass",
             Self::VoxelDebug => "Voxel debug pass",
             Self::Lut => "Atmosphere LUT",

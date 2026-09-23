@@ -141,18 +141,21 @@ fn show_profiler(ui: &mut Ui, profiler: &ProfilerHistory) {
             &format!("{fps:.1}"),
             GRUVBOX_GREEN,
         );
+
         metric_card(
             ui,
             "FRAME",
             &format!("{frame_ms:.2} ms"),
             frame_color(frame_ms),
         );
+
         metric_card(
             ui,
             "CPU WORK",
             &format!("{cpu_ms:.2} ms"),
             GRUVBOX_BLUE,
         );
+
         if profiler.gpu_supported() {
             metric_card(
                 ui,

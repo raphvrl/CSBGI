@@ -140,6 +140,7 @@ impl State {
             &self.camera,
             self.clock.delta_time(),
         );
+
         self.debug
             .record_cpu_time(ProfileStage::RendererPreparation, started);
     }

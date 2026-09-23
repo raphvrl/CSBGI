@@ -1,4 +1,4 @@
-import package::common::voxel::geometry_sampler::{
+import package::common::voxel::geometry::{
     grid,
     mip_info,
     sample_voxel_lod,

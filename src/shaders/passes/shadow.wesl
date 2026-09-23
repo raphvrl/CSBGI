@@ -1,5 +1,6 @@
 import package::common::frame::Frame;
 import package::common::material::Material;
+import package::common::alpha::passes_alpha_test;
 import package::common::object::ObjectUniform;
 import package::common::vertex::VertexInput;
 
@@ -26,8 +27,6 @@ var base_color_texture: texture_2d<f32>;
 @group(2) @binding(4)
 var material_sampler: sampler;
 
-const ALPHA_CUTOFF: f32 = 0.1;
-
 @vertex
 fn vs_main(input: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
     let model = objects[instance].model;
@@ -47,7 +46,7 @@ fn fs_main(input: VertexOutput) {
         input.uv,
     ) * material.base_color_factor;
 
-    if base_color.a < ALPHA_CUTOFF {
+    if !passes_alpha_test(base_color.a, material) {
         discard;
     }
 }

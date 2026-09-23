@@ -61,7 +61,7 @@ mod tests {
 
     use glam::{Mat4, UVec3, Vec2, Vec3};
 
-    use crate::assets::data::{ImageData, MaterialData, NodeData, VertexData};
+    use crate::assets::data::{AlphaMode, ImageData, MaterialData, NodeData, VertexData};
 
     fn test_grid() -> VoxelGrid {
         VoxelGrid {
@@ -130,6 +130,9 @@ mod tests {
         let scene = SceneData {
             materials: vec![MaterialData {
                 color_factor: [1.0, 0.0, 0.0, 1.0],
+                alpha_mode: AlphaMode::Opaque,
+                alpha_cutoff: 0.5,
+                double_sided: false,
                 metallic_factor: 0.0,
                 roughness_factor: 1.0,
                 occlusion_factor: 1.0,
@@ -173,6 +176,9 @@ mod tests {
             }],
             materials: vec![MaterialData {
                 color_factor: [1.0, 1.0, 1.0, 1.0],
+                alpha_mode: AlphaMode::Opaque,
+                alpha_cutoff: 0.5,
+                double_sided: false,
                 metallic_factor: 0.0,
                 roughness_factor: 1.0,
                 occlusion_factor: 1.0,

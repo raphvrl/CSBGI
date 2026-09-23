@@ -1,5 +1,6 @@
 import package::common::frame::Frame;
 import package::common::material::Material;
+import package::common::alpha::passes_alpha_test;
 import package::common::normal::{matrix, tangent};
 import package::common::object::ObjectUniform;
 import package::common::shadow::visibility;
@@ -34,8 +35,6 @@ var orm_texture: texture_2d<f32>;
 @group(2) @binding(4)
 var material_sampler: sampler;
 
-const ALPHA_CUTOFF: f32 = 0.1;
-
 @vertex
 fn vs_main(in: VertexInput, @builtin(instance_index) instance: u32) -> VertexOutput {
     let model = objects[instance].model;
@@ -54,14 +53,14 @@ fn vs_main(in: VertexInput, @builtin(instance_index) instance: u32) -> VertexOut
 }
 
 @fragment
-fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
+fn fs_main(input: VertexOutput, @builtin(front_facing) front_facing: bool) -> @location(0) vec4<f32> {
     let base_color = textureSample(
         base_color_texture,
         material_sampler,
         input.uv,
     ) * material.base_color_factor;
 
-    if base_color.a < ALPHA_CUTOFF {
+    if !passes_alpha_test(base_color.a, material) {
         discard;
     }
 
@@ -77,7 +76,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         input.uv,
     ).xyz * 2.0 - 1.0;
 
-    let normal = tangent(
+    let surface_normal = tangent(
         input.normal,
         input.tangent,
         normalize(vec3<f32>(
@@ -86,6 +85,7 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
             encoded_normal.z,
         )),
     );
+    let normal = select(-surface_normal, surface_normal, front_facing);
 
     let shadow = visibility(
         shadow_map,
@@ -112,5 +112,5 @@ fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
         indirect_radiance,
     );
 
-    return vec4<f32>(color, base_color.a);
+    return vec4<f32>(color, 1.0);
 }

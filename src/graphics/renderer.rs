@@ -11,6 +11,7 @@ use crate::{
         lighting::DirectionalLight,
         lut::Lut,
         pass::{
+            depth::{DepthPrepass, DepthPrepassInput},
             exposure::{ExposurePass, ExposureSettings},
             geometry::{GeometryPass, GeometryPassInput},
             luminance::{LuminancePass, LuminancePassInput},
@@ -90,6 +91,7 @@ impl RendererResources {
         let shadow_target = ShadowTarget::new(graphics);
         let lut = Lut::new(graphics.device());
         let frame_gpu = FrameGpu::new(graphics, &shadow_target, &depth_target, &lut);
+
         let object_gpu = ObjectGpu::new(graphics);
 
         Self {
@@ -113,20 +115,27 @@ pub(crate) struct Renderer {
     luminance_target: LuminanceTarget,
     depth_target: DepthTarget,
     shadow_target: ShadowTarget,
+
     frame_gpu: FrameGpu,
     object_gpu: ObjectGpu,
+
     shadow_pass: ShadowPass,
     sky_pass: SkyPass,
+    depth_prepass: DepthPrepass,
     geometry_pass: GeometryPass,
+
     lut: Lut,
     lut_pass: LutPass,
     lut_key: Option<LutKey>,
     lut_timer: f32,
+
     luminance_pass: LuminancePass,
     exposure_pass: ExposurePass,
+
     tonemapping_binding: ToneMappingBinding,
     tonemapping_pass: ToneMappingPass,
     controls: RendererControls,
+
     gpu_profiler: GpuProfiler,
 }
 
@@ -159,7 +168,16 @@ impl Renderer {
             object_gpu.layout(),
             scene.material_assets().layout(),
         );
+
         let sky_pass = SkyPass::new(graphics, frame_gpu.sky_layout());
+
+        let depth_prepass = DepthPrepass::new(
+            graphics,
+            frame_gpu.layout(),
+            object_gpu.layout(),
+            scene.material_assets().layout(),
+        );
+
         let geometry_pass = GeometryPass::new(
             graphics,
             frame_gpu.layout(),
@@ -167,18 +185,23 @@ impl Renderer {
             scene.material_assets().layout(),
             voxel.sampling_layout(),
         );
+
         let lut_pass = LutPass::new(graphics, frame_gpu.lut_layout());
+
         let luminance_pass = LuminancePass::new(
             graphics,
             scene_color_target.resolve_view(),
             &luminance_target,
         );
+
         let exposure_pass = ExposurePass::new(graphics, luminance_target.final_view());
+
         let tonemapping_binding = ToneMappingBinding::new(
             graphics,
             scene_color_target.resolve_view(),
             exposure_pass.buffer(),
         );
+
         let tonemapping_pass = ToneMappingPass::new(graphics, &tonemapping_binding);
 
         Self {
@@ -190,6 +213,7 @@ impl Renderer {
             object_gpu,
             shadow_pass,
             sky_pass,
+            depth_prepass,
             geometry_pass,
             lut,
             lut_pass,
@@ -220,19 +244,24 @@ impl Renderer {
     pub(crate) fn resize(&mut self, graphics: &GraphicsContext, width: u32, height: u32) {
         self.scene_color_target.resize(graphics, width, height);
         self.luminance_target.resize(graphics, width, height);
+
         self.tonemapping_binding.update_source(
             graphics.device(),
             self.scene_color_target.resolve_view(),
             self.exposure_pass.buffer(),
         );
+
         self.luminance_pass.update_bindings(
             graphics,
             self.scene_color_target.resolve_view(),
             &self.luminance_target,
         );
+
         self.exposure_pass
             .update_luminance(graphics, self.luminance_target.final_view());
+
         self.depth_target.resize(graphics, width, height);
+
         self.frame_gpu
             .update_depth_target(graphics, &self.depth_target, &self.lut);
     }
@@ -250,6 +279,7 @@ impl Renderer {
     ) {
         let models = scene.model_matrices();
         self.object_gpu.update(graphics, &models);
+
         self.exposure_pass
             .set_enabled(self.controls.auto_exposure_enabled);
 
@@ -262,6 +292,7 @@ impl Renderer {
         }
 
         let key = LutKey::new(camera.camera().position.y, scene.light());
+
         let initial = self.lut_key.is_none();
         let changed = self
             .lut_key
@@ -277,6 +308,7 @@ impl Renderer {
         let light_view_projection = scene
             .light()
             .shadow_view_projection(scene.shadow_settings());
+
         self.frame_gpu.update(
             graphics.queue(),
             camera.camera(),
@@ -303,9 +335,11 @@ impl Renderer {
 
         let device = graphics.device();
         let queue = graphics.queue();
+
         let surface_view = output
             .texture
             .create_view(&wgpu::TextureViewDescriptor::default());
+
         let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
             label: Some("Render Encoder"),
         });
@@ -320,6 +354,7 @@ impl Renderer {
         let started = Instant::now();
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::Shadow);
+
         if frame.voxel.needs_shadow_pass() {
             self.shadow_pass.record(
                 &mut encoder,
@@ -333,16 +368,21 @@ impl Renderer {
                 },
             );
         }
+
         self.gpu_profiler
             .write_end(&mut encoder, ProfileStage::Shadow);
+
         frame.debug.record_cpu_time(ProfileStage::Shadow, started);
 
         let started = Instant::now();
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::VoxelLighting);
+
         frame.voxel.record_lighting(&mut encoder, frame_bind_group);
+
         self.gpu_profiler
             .write_end(&mut encoder, ProfileStage::VoxelLighting);
+
         frame
             .debug
             .record_cpu_time(ProfileStage::VoxelLighting, started);
@@ -350,6 +390,7 @@ impl Renderer {
         let started = Instant::now();
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::Sky);
+
         self.sky_pass.record(
             &mut encoder,
             SkyPassInput {
@@ -357,12 +398,41 @@ impl Renderer {
                 frame_bind_group: self.frame_gpu.sky_bind_group(),
             },
         );
+
         self.gpu_profiler.write_end(&mut encoder, ProfileStage::Sky);
+
         frame.debug.record_cpu_time(ProfileStage::Sky, started);
 
         let started = Instant::now();
         self.gpu_profiler
+            .write_start(&mut encoder, ProfileStage::DepthPrepass);
+
+        if !frame.voxel.uses_solid_debug() {
+            self.depth_prepass.record(
+                &mut encoder,
+                DepthPrepassInput {
+                    color_view: self.scene_color_target.msaa_view(),
+                    depth_view,
+                    frame_bind_group,
+                    object_bind_group,
+                    material_assets: frame.scene.material_assets(),
+                    mesh_draws: frame.scene.draws(),
+                    mesh_assets: frame.scene.mesh_assets(),
+                },
+            );
+        }
+
+        self.gpu_profiler
+            .write_end(&mut encoder, ProfileStage::DepthPrepass);
+
+        frame
+            .debug
+            .record_cpu_time(ProfileStage::DepthPrepass, started);
+
+        let started = Instant::now();
+        self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::Geometry);
+
         if !frame.voxel.uses_solid_debug() {
             self.geometry_pass.record(
                 &mut encoder,
@@ -379,13 +449,16 @@ impl Renderer {
                 },
             );
         }
+
         self.gpu_profiler
             .write_end(&mut encoder, ProfileStage::Geometry);
+
         frame.debug.record_cpu_time(ProfileStage::Geometry, started);
 
         let started = Instant::now();
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::VoxelDebug);
+
         frame.voxel.record_debug(
             queue,
             &mut encoder,
@@ -394,8 +467,10 @@ impl Renderer {
             depth_view,
             frame_bind_group,
         );
+
         self.gpu_profiler
             .write_end(&mut encoder, ProfileStage::VoxelDebug);
+
         frame
             .debug
             .record_cpu_time(ProfileStage::VoxelDebug, started);
@@ -403,6 +478,7 @@ impl Renderer {
         let started = Instant::now();
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::Lut);
+
         if self.lut.needs_update() {
             self.lut_pass.record(
                 &mut encoder,
@@ -413,12 +489,15 @@ impl Renderer {
             );
             self.lut.mark_updated();
         }
+
         self.gpu_profiler.write_end(&mut encoder, ProfileStage::Lut);
+
         frame.debug.record_cpu_time(ProfileStage::Lut, started);
 
         let started = Instant::now();
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::Luminance);
+
         self.luminance_pass.record(
             &mut encoder,
             LuminancePassInput {
@@ -426,8 +505,10 @@ impl Renderer {
                 target: &self.luminance_target,
             },
         );
+
         self.gpu_profiler
             .write_end(&mut encoder, ProfileStage::Luminance);
+
         frame
             .debug
             .record_cpu_time(ProfileStage::Luminance, started);
@@ -435,14 +516,18 @@ impl Renderer {
         let started = Instant::now();
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::Exposure);
+
         self.exposure_pass.record(&mut encoder);
+
         self.gpu_profiler
             .write_end(&mut encoder, ProfileStage::Exposure);
+
         frame.debug.record_cpu_time(ProfileStage::Exposure, started);
 
         let started = Instant::now();
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::Tonemapping);
+
         self.tonemapping_pass.record(
             &mut encoder,
             ToneMappingPassInput {
@@ -450,8 +535,10 @@ impl Renderer {
                 target_view: &surface_view,
             },
         );
+
         self.gpu_profiler
             .write_end(&mut encoder, ProfileStage::Tonemapping);
+
         frame
             .debug
             .record_cpu_time(ProfileStage::Tonemapping, started);
@@ -459,6 +546,7 @@ impl Renderer {
         let started = Instant::now();
         self.gpu_profiler
             .write_start(&mut encoder, ProfileStage::Egui);
+
         frame.debug.render(
             device,
             queue,
@@ -466,14 +554,18 @@ impl Renderer {
             &surface_view,
             [graphics.width(), graphics.height()],
         );
+
         self.gpu_profiler
             .write_end(&mut encoder, ProfileStage::Egui);
+
         frame.debug.record_cpu_time(ProfileStage::Egui, started);
 
         let gpu_slot = self.gpu_profiler.resolve(&mut encoder);
         queue.submit(std::iter::once(encoder.finish()));
+
         self.gpu_profiler.submitted(gpu_slot);
         queue.present(output);
+
         Ok(())
     }
 }

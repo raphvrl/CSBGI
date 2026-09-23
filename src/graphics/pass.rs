@@ -1,4 +1,5 @@
 pub mod debug;
+pub mod depth;
 pub mod egui;
 pub mod exposure;
 pub mod geometry;

@@ -18,6 +18,13 @@ pub struct ImageData {
     pub rgba8: Vec<u8>,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum AlphaMode {
+    Opaque,
+    Mask,
+    Blend,
+}
+
 #[derive(Debug)]
 pub struct MaterialData {
     pub color_factor: [f32; 4],
@@ -28,6 +35,9 @@ pub struct MaterialData {
     pub normal_image: Option<ImageIndex>,
     pub orm_image: Option<ImageIndex>,
     pub normal_scale: f32,
+    pub alpha_mode: AlphaMode,
+    pub alpha_cutoff: f32,
+    pub double_sided: bool,
 }
 
 #[derive(Debug)]

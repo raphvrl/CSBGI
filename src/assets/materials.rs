@@ -2,7 +2,7 @@ use anyhow::{Result, anyhow};
 
 use crate::{
     assets::{
-        data::{MaterialData, MaterialIndex},
+        data::{AlphaMode, MaterialData, MaterialIndex},
         handles::MaterialHandle,
         textures::TextureAssets,
     },
@@ -44,6 +44,9 @@ impl MaterialAssets {
             default_orm_texture,
             MaterialParameters {
                 base_color_factor: [1.0; 4],
+                alpha_mode: AlphaMode::Opaque,
+                alpha_cutoff: 0.5,
+                double_sided: false,
                 normal_scale: 1.0,
                 metallic_factor: 0.0,
                 roughness_factor: 1.0,
@@ -89,6 +92,9 @@ impl MaterialAssets {
                 orm_texture,
                 MaterialParameters {
                     base_color_factor: material.color_factor,
+                    alpha_mode: material.alpha_mode,
+                    alpha_cutoff: material.alpha_cutoff,
+                    double_sided: material.double_sided,
                     normal_scale: material.normal_scale,
                     metallic_factor: material.metallic_factor,
                     roughness_factor: material.roughness_factor,

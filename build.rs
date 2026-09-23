@@ -5,6 +5,7 @@ fn build_shader(module: &str, artifact: &str) {
 
 fn main() {
     build_shader("package::passes::geometry", "geometry");
+    build_shader("package::passes::depth", "depth");
     build_shader("package::passes::mipmap", "mipmap");
     build_shader("package::passes::shadow", "shadow");
     build_shader("package::passes::sky", "sky");

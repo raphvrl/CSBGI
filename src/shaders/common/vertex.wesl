@@ -6,7 +6,7 @@ struct VertexInput {
 }
 
 struct VertexOutput {
-    @builtin(position)
+    @builtin(position) @invariant
     position: vec4<f32>,
 
     @location(0)

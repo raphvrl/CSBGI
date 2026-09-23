@@ -12,6 +12,7 @@ struct MaterialUniform {
     base_color_factor: [f32; 4],
     normal_scale: [f32; 4],
     pbr_factors: [f32; 4],
+    alpha_parameters: [f32; 4],
 }
 
 pub struct MaterialLayout {
@@ -53,10 +54,14 @@ impl MaterialLayout {
 pub struct MaterialGpu {
     _buffer: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
+    double_sided: bool,
 }
 
 pub struct MaterialParameters {
     pub base_color_factor: [f32; 4],
+    pub alpha_mode: crate::assets::data::AlphaMode,
+    pub alpha_cutoff: f32,
+    pub double_sided: bool,
     pub normal_scale: f32,
     pub metallic_factor: f32,
     pub roughness_factor: f32,
@@ -82,6 +87,12 @@ impl MaterialGpu {
                 parameters.occlusion_factor,
                 0.0,
             ],
+            alpha_parameters: [
+                parameters.alpha_cutoff,
+                f32::from(parameters.alpha_mode == crate::assets::data::AlphaMode::Mask),
+                0.0,
+                0.0,
+            ],
         };
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -104,10 +115,15 @@ impl MaterialGpu {
         Self {
             _buffer: buffer,
             bind_group,
+            double_sided: parameters.double_sided,
         }
     }
 
     pub fn bind_group(&self) -> &wgpu::BindGroup {
         &self.bind_group
+    }
+
+    pub fn double_sided(&self) -> bool {
+        self.double_sided
     }
 }

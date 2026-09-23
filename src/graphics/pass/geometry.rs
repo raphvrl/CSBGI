@@ -32,7 +32,8 @@ pub struct GeometryPassInput<'a> {
 }
 
 pub struct GeometryPass {
-    pipeline: wgpu::RenderPipeline,
+    single_sided_pipeline: wgpu::RenderPipeline,
+    double_sided_pipeline: wgpu::RenderPipeline,
 }
 
 impl GeometryPass {
@@ -50,37 +51,42 @@ impl GeometryPass {
             source: wgpu::ShaderSource::Wgsl(include_wesl!("geometry").into()),
         });
 
-        let pipeline = device
-            .render_pipeline_builder()
-            .label("Geometry Pipeline")
-            .shader(&shader)
-            .bind_group_layout(frame_layout)
-            .bind_group_layout(object_layout)
-            .bind_group_layout(material_layout)
-            .bind_group_layout(voxel_sampling_layout)
-            .vertex_layout(Vertex::layout())
-            .primitive(wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                ..Default::default()
-            })
-            .color_format(SceneColorTarget::FORMAT)
-            .depth_stencil(wgpu::DepthStencilState {
-                format: DepthTarget::FORMAT,
-                depth_write_enabled: Some(true),
-                depth_compare: Some(wgpu::CompareFunction::Less),
-                stencil: Default::default(),
-                bias: Default::default(),
-            })
-            .multisample(wgpu::MultisampleState {
-                count: MSAA_SAMPLES,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            })
-            .build();
+        let pipeline = |label, cull_mode| {
+            device
+                .render_pipeline_builder()
+                .label(label)
+                .shader(&shader)
+                .bind_group_layout(frame_layout)
+                .bind_group_layout(object_layout)
+                .bind_group_layout(material_layout)
+                .bind_group_layout(voxel_sampling_layout)
+                .vertex_layout(Vertex::layout())
+                .primitive(wgpu::PrimitiveState {
+                    topology: wgpu::PrimitiveTopology::TriangleList,
+                    front_face: wgpu::FrontFace::Ccw,
+                    cull_mode,
+                    ..Default::default()
+                })
+                .color_format(SceneColorTarget::FORMAT)
+                .depth_stencil(wgpu::DepthStencilState {
+                    format: DepthTarget::FORMAT,
+                    depth_write_enabled: Some(false),
+                    depth_compare: Some(wgpu::CompareFunction::LessEqual),
+                    stencil: Default::default(),
+                    bias: Default::default(),
+                })
+                .multisample(wgpu::MultisampleState {
+                    count: MSAA_SAMPLES,
+                    mask: !0,
+                    alpha_to_coverage_enabled: false,
+                })
+                .build()
+        };
 
-        Self { pipeline }
+        Self {
+            single_sided_pipeline: pipeline("Geometry Pipeline", Some(wgpu::Face::Back)),
+            double_sided_pipeline: pipeline("Double-Sided Geometry Pipeline", None),
+        }
     }
 
     pub fn record(&self, encoder: &mut wgpu::CommandEncoder, input: GeometryPassInput<'_>) {
@@ -91,10 +97,9 @@ impl GeometryPass {
             .resolve(input.resolve_view)
             .load()
             .depth(input.depth_view)
-            .clear(1.0)
+            .load()
             .build();
 
-        rpass.set_pipeline(&self.pipeline);
         rpass.set_bind_group(0, input.frame_bind_group, &[]);
         rpass.set_bind_group(1, input.object_bind_group, &[]);
         rpass.set_bind_group(3, input.voxel_sampling_bind_group, &[]);
@@ -104,6 +109,12 @@ impl GeometryPass {
                 input.mesh_assets.get(item.mesh),
                 input.material_assets.get(item.material),
             ) {
+                let pipeline = if material.double_sided() {
+                    &self.double_sided_pipeline
+                } else {
+                    &self.single_sided_pipeline
+                };
+                rpass.set_pipeline(pipeline);
                 rpass.set_bind_group(2, material.bind_group(), &[]);
                 mesh.draw(&mut rpass, instance as u32);
             }
